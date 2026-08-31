@@ -1,0 +1,4 @@
+interface:
+  display_name: "Session Marking"
+  short_description: "Bind this session to one explicit target"
+  default_prompt: "Mark the current session using the target selection I provide."

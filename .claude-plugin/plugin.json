@@ -1,0 +1,8 @@
+{
+  "name": "session-marking",
+  "version": "1.1.1",
+  "description": "Bind the current agent session to one explicit target through a configured adapter.",
+  "author": {
+    "name": "AdCreative"
+  }
+}
