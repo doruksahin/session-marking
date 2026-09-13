@@ -44,9 +44,9 @@ test("configuration is private and contains one canonical adapter", async (t) =>
   const configPath = path.join(item.config, "config.json");
   assert.equal((await stat(configPath)).mode & 0o777, 0o600);
   const config = JSON.parse(await readFile(configPath, "utf8"));
-  assert.deepEqual(Object.keys(config), ["schemaVersion", "adapter"]);
-  assert.equal(config.adapter.name, "fixture");
-  assert.equal(config.adapter.module, item.modulePath);
+  assert.deepEqual(Object.keys(config), ["schemaVersion", "local", "host"]);
+  assert.equal(config.host.name, "fixture");
+  assert.equal(config.host.module, item.modulePath);
 });
 
 test("describe exposes the configured adapter selection without requiring a session", async (t) => {

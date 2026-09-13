@@ -25,19 +25,23 @@ export async function markCurrentSession({ selection, adapterName, environment =
     markedAt: now().toISOString(),
     workingDirectory: cwd,
   });
-  const claim = await claimBinding(desired, { environment });
+  const claim = config.local.enabled
+    ? await claimBinding(desired, { environment, directory: config.local.directory })
+    : null;
+  const binding = claim?.binding ?? desired;
   const projection = adapter.projectBinding === null
     ? null
-    : validateProjection(await adapter.projectBinding(Object.freeze({ binding: claim.binding, context: resolution.context })));
+    : validateProjection(await adapter.projectBinding(Object.freeze({ binding, context: resolution.context, ...(claim ? {} : { bindingPersisted: false }) })));
   return Object.freeze({
     ok: true,
     adapter: adapter.name,
-    provider: claim.binding.session.provider,
-    sessionId: claim.binding.session.id,
-    sessionUrl: claim.binding.session.url,
-    binding: claim.status,
-    bindingPath: claim.targetPath,
-    target: claim.binding.target,
+    provider: binding.session.provider,
+    sessionId: binding.session.id,
+    sessionUrl: binding.session.url,
+    binding: claim?.status ?? null,
+    bindingPath: claim?.targetPath ?? null,
+    local: claim ? Object.freeze({ bindingPath: claim.targetPath }) : null,
+    target: binding.target,
     projection,
   });
 }

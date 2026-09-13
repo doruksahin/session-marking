@@ -5,8 +5,8 @@ import { fail } from "./errors.mjs";
 import { stateDirectory } from "./paths.mjs";
 import { publishExclusive, readOptionalFile, secureChildDirectory } from "./safe-files.mjs";
 
-export async function claimBinding(binding, { environment = process.env } = {}) {
-  const root = stateDirectory(environment);
+export async function claimBinding(binding, { environment = process.env, directory: configuredDirectory = null } = {}) {
+  const root = stateDirectory(environment, process.platform, configuredDirectory);
   const directory = await secureChildDirectory(root, "bindings", binding.session.provider);
   const filename = `${binding.session.id}.json`;
   const targetPath = path.join(directory, filename);

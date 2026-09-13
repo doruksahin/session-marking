@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 3,
+  "local": {
+    "enabled": true,
+    "directory": null
+  },
+  "host": {
+    "enabled": false,
+    "name": null,
+    "module": null
+  }
+}
