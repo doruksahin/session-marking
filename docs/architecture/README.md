@@ -2,9 +2,9 @@
 
 ## Responsibility
 
-This repository owns the portable current-session marking plugin and its native distribution for
-Codex and Claude Code. By default, it creates one immutable machine-local claim per provider session. Built-in local mode validates project/task selection; an optional host
-adapter owns its target validation and record publication. The workspace owns checkout assembly;
+This repository owns the portable session-marking plugin and its native distribution for
+Codex and Claude Code. By default, it creates one immutable machine-local claim per provider session. The core validates common project/task/stage selection; an optional host
+adapter owns destination validation and record publication. The workspace owns checkout assembly;
 [the architecture owner](https://github.com/doruksahin/plugin-architecture/blob/main/standard/README.md)
 owns cross-repository decisions and the shared checker.
 
@@ -12,8 +12,8 @@ owns cross-repository decisions and the shared checker.
 
 The public host interface is [scripts/session-marking.mjs](../../scripts/session-marking.mjs).
 Local output is enabled by default. An enabled external host adapter implements
-[API version 1](../adapter-contract.md). The
-[skill](../../skills/session-marking/SKILL.md) discovers the selected mode's fields and invokes
+[API version 2](../adapter-contract.md). The
+[skill](../../skills/session-marking/SKILL.md) discovers common fields and enabled host requirements and invokes
 the same CLI. Provider manifests expose the skill; both native marketplaces install this root.
 
 ## Dependencies
@@ -25,8 +25,9 @@ Python, while provider installation and marking require only the Node.js runtime
 
 ## Execution and storage
 
-The CLI runs locally. [Provider identity](../../src/session.mjs) comes from the host environment.
-[Marking](../../src/mark.mjs) resolves the selected target and claims its immutable local binding
+The CLI runs locally. [Provider identity](../../src/session.mjs) comes from an explicit provider/ID
+pair when supplied, otherwise from the current provider environment.
+[Marking](../../src/mark.mjs) validates the common target and claims its immutable local binding
 only when local persistence is enabled. The host receives that winning binding, or the invocation's
 candidate when local is disabled, with `bindingPersisted: false` only for host-only calls. Success returns
 the local path and status when stored, otherwise null local fields, plus any host projection.
@@ -49,7 +50,7 @@ fields or storage writes.
 
 ## Failure behavior
 
-Missing or ambiguous session identity, invalid configuration, invalid local selection, invalid adapter exports, and
+Missing or ambiguous session identity, invalid configuration, invalid selection, invalid adapter exports, and
 conflicting local claims fail before projection. With local persistence enabled, a projection failure
 retains the claim and an identical retry can repair publication. Host-only failures leave no local
 claim; retry behavior belongs to the host. [The adapter contract](../adapter-contract.md#target-and-retry-obligations)
@@ -63,7 +64,7 @@ records host obligations and [CLI errors](../adapter-contract.md#errors) define 
 | Shared option definitions, argument parsing, and help text | [cli.mjs](../../src/cli.mjs) |
 | Runtime operation order | [mark.mjs](../../src/mark.mjs) |
 | Config parsing, defaults, and path selection | [config.mjs](../../src/config.mjs), [config.defaults.json](../../config.defaults.json), [paths.mjs](../../src/paths.mjs) |
-| Local selection and host adapter loading | [local-target.mjs](../../src/local-target.mjs), [adapter.mjs](../../src/adapter.mjs) |
+| Common selection and host adapter loading | [target.mjs](../../src/target.mjs), [adapter.mjs](../../src/adapter.mjs) |
 | Provider identity and binding format | [session.mjs](../../src/session.mjs), [binding.mjs](../../src/binding.mjs), [canonical-json.mjs](../../src/canonical-json.mjs) |
 | Local binding reads, immutable writes, and filesystem operations | [store.mjs](../../src/store.mjs), [safe-files.mjs](../../src/safe-files.mjs) |
 | Listing filters and sorting | [query.mjs](../../src/query.mjs) |
@@ -72,14 +73,15 @@ records host obligations and [CLI errors](../adapter-contract.md#errors) define 
 Host adapters stay in their owning repositories and use the [adapter contract](../adapter-contract.md).
 CLI parsing and help share command and option definitions. Help returns before user configuration,
 adapter loading, or session lookup; examples are exercised through the executable in temporary stores.
-Local persistence uses the same binding operation for built-in and host-resolved targets.
+The core creates one `session-marking/target-v1` target for both enabled destinations. The host
+prepares transient publication context without changing that target.
 [Extraction provenance](../extraction.md) identifies the retained source baseline. Version mirrors
 and the independent release lane are owned by [the release configuration](../../release-please-config.json).
 
 ## Planned changes
 
 Local persistence and optional host projection are controlled by user configuration. They share one
-resolver and binding input. Additional routing, SDK packages, and storage backends are outside
+core target and binding input. Additional routing, SDK packages, and storage backends are outside
 this change.
 
 ## Decisions

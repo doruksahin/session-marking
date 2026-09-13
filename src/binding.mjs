@@ -13,9 +13,11 @@ function canonicalTimestamp(value) {
 }
 
 export function createBinding(input) {
-  if (!exactKeys(input, ["markedAt", "schemaVersion", "session", "target", "workingDirectory"]) || input.schemaVersion !== BINDING_SCHEMA_VERSION) {
+  const hasDescription = input != null && Object.hasOwn(input, "description");
+  if (!exactKeys(input, ["markedAt", "schemaVersion", "session", "target", "workingDirectory", ...(hasDescription ? ["description"] : [])]) || input.schemaVersion !== BINDING_SCHEMA_VERSION) {
     fail("BINDING_INVALID", "The session binding schema is invalid.");
   }
+  if (hasDescription && typeof input.description !== "string") fail("BINDING_INVALID", "The binding description must be a string.");
   if (!exactKeys(input.session, ["id", "provider", "url"])) fail("BINDING_INVALID", "The binding session schema is invalid.");
   const provider = validateProvider(input.session.provider, "BINDING_INVALID");
   if (!SESSION_ID_PATTERN.test(input.session.id || "") || input.session.url !== sessionUrl(provider, input.session.id)) {
@@ -27,6 +29,7 @@ export function createBinding(input) {
     target: canonicalValue(input.target, { requireObject: true }),
     markedAt: canonicalTimestamp(input.markedAt),
     workingDirectory: canonicalWorkingDirectory(input.workingDirectory),
+    ...(hasDescription ? { description: canonicalValue(input.description) } : {}),
   });
 }
 

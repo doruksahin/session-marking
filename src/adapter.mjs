@@ -2,7 +2,7 @@ import { pathToFileURL } from "node:url";
 
 import { canonicalValue } from "./canonical-json.mjs";
 import { exactKeys, fail, plainObject } from "./errors.mjs";
-import * as localTarget from "./local-target.mjs";
+import { OPTIONAL_FIELDS } from "./target.mjs";
 
 const ADAPTER_ERROR_CODE_PATTERN = /^[A-Z][A-Z0-9_]{0,63}$/;
 
@@ -31,31 +31,36 @@ export async function loadAdapter(config) {
   if (!config.host.enabled) {
     return Object.freeze({
       name: "local",
-      describeSelection: localTarget.describeSelection,
-      resolveTarget: localTarget.resolveTarget,
+      describeRequirements: () => ({ required: [], description: "" }),
+      prepareBinding: null,
       projectBinding: null,
     });
   }
   let loaded;
   try { loaded = await import(pathToFileURL(config.host.module).href); } catch { fail("ADAPTER_LOAD_FAILED", "The configured session-marking adapter could not be loaded."); }
-  if (loaded.adapterApiVersion !== 1 || typeof loaded.describeSelection !== "function" || typeof loaded.resolveTarget !== "function" || typeof loaded.projectBinding !== "function") {
-    fail("ADAPTER_INVALID", "The configured session-marking adapter does not implement API version 1.");
+  if (loaded.adapterApiVersion !== 2 || typeof loaded.describeRequirements !== "function" || typeof loaded.prepareBinding !== "function" || typeof loaded.projectBinding !== "function") {
+    fail("ADAPTER_INVALID", "The configured session-marking adapter does not implement API version 2.");
   }
   return Object.freeze({
     name: config.host.name,
-    describeSelection: adapterOperation(loaded.describeSelection),
-    resolveTarget: adapterOperation(loaded.resolveTarget),
+    describeRequirements: adapterOperation(loaded.describeRequirements),
+    prepareBinding: adapterOperation(loaded.prepareBinding),
     projectBinding: adapterOperation(loaded.projectBinding),
   });
 }
 
-export function validateDescription(value) {
-  return canonicalValue(value, { requireObject: true });
+export async function readRequirements(adapter) {
+  const value = await adapter.describeRequirements();
+  if (!exactKeys(value, ["required", "description"]) || !Array.isArray(value.required)
+    || value.required.length > OPTIONAL_FIELDS.length || value.required.some((field) => !OPTIONAL_FIELDS.includes(field)) || typeof value.description !== "string") {
+    fail("ADAPTER_INVALID", "The adapter requirements may only require stageId and describe destination constraints.");
+  }
+  return value;
 }
 
-export function validateResolution(value) {
-  if (!exactKeys(value, ["context", "target"]) || !plainObject(value.context)) fail("ADAPTER_INVALID", "The adapter returned an invalid target resolution.");
-  return Object.freeze({ target: canonicalValue(value.target, { requireObject: true }), context: value.context });
+export function validatePreparation(value) {
+  if (!exactKeys(value, ["context"]) || !plainObject(value.context)) fail("ADAPTER_INVALID", "The adapter must prepare context without replacing the shared target.");
+  return value;
 }
 
 export function validateProjection(value) {

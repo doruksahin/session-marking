@@ -20,7 +20,7 @@ Run `npm run verify` for portable implementation or distribution changes. Run
 `python3 .architecture/check.py` for architecture changes. The shared checker is synchronized
 through the owner procedure in [its provenance](.architecture/SOURCE.md).
 
-Host selection and projection belong to adapters. Keep runtime code independent of host layouts;
-use temporary configuration and state directories in tests. Keep command details in the CLI guide,
+Core selection belongs to the plugin; host validation and projection belong to adapters. Keep runtime
+code independent of host layouts; use temporary configuration and state directories in tests. Keep command details in the CLI guide,
 settings in the configuration guide, and adapter obligations in the adapter contract; link to the
 owning guide from entry points instead of repeating its reference material.

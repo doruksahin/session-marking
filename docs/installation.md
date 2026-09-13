@@ -23,7 +23,7 @@ uses the local source. Source and version changes take effect on the next comman
 Rerun `pnpm add -g "$PWD"` if the command name or entry-point path changes.
 
 Continue with [your first mark](cli.md#mark-your-first-session). A native plugin is optional for CLI use;
-marking still requires the current provider session's environment.
+marking uses the current provider environment or [an explicit identity](cli.md#session-identity).
 
 ## Native plugin
 

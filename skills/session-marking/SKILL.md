@@ -1,16 +1,17 @@
 ---
 name: session-marking
-description: Explicitly bind the current Codex or Claude Code session to one operator-selected target with configured local output and optional host projection. Use when the user asks to mark, attach, associate, or record the current session for a task or workflow context.
+description: Bind a Codex or Claude Code session to one operator-selected target with configured local output and optional host projection. Use when the user asks to mark, attach, associate, or record a session for a task or workflow context.
 ---
 
 # Session Marking
 
-Mark only the current session. Never accept a provider or session ID from the user, infer a missing
-target selection, create shared arm state, or install a prompt-submit hook.
+Use the current provider environment by default. When the user selects a known session explicitly,
+obtain both its provider and session ID; preserve the operator's choice. Ask for missing target
+fields rather than inferring them.
 
 1. Resolve `../../scripts/session-marking.mjs` relative to this file to an absolute CLI path. Run its
-   `describe` command to obtain the active resolver's required fields. Continue when the user has
-   explicitly selected all required fields.
+   `describe` command to obtain the common fields and any enabled host requirements. Continue when
+   the user has explicitly selected all required fields.
 2. Preserve the user's explicit target fields as the described JSON object and run:
 
    ```sh
@@ -18,15 +19,15 @@ target selection, create shared arm state, or install a prompt-submit hook.
    ```
 
    Use the absolute path from step 1 for `<resolved-cli-path>`. Add `--adapter <name>` only when the
-   user explicitly selects an adapter. This asserts the active resolver; configured outputs still
-   apply. Keep the user's current working directory.
+   user explicitly selects an adapter. This asserts the configured adapter; configured outputs still
+   apply. Pass a user-supplied work description separately with `--description`; it is not a target
+   field. For an explicitly selected session, add both `--provider` and `--session-id` using the
+   [identity rules](../../docs/cli.md#session-identity). Keep the user's current working directory.
 3. Treat the command's JSON as authoritative. On success, report the provider, session, and target.
    When `local` is present, report its binding status and `bindingPath`; when `projection` is present,
    report the host result. A null `local` means local persistence was disabled and no local binding
    was read or written. On failure, report the bounded error without overwriting or
    repairing a conflicting binding.
-
-The command derives provider and session identity exclusively from the current agent environment.
 
 ## Only when needed
 
