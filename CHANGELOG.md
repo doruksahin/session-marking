@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.0](https://github.com/doruksahin/session-marking/compare/session-marking-v1.5.0...session-marking-v1.6.0) (2026-09-13)
+
+
+### Features
+
+* **cli:** list saved sessions and expose command help ([5712b96](https://github.com/doruksahin/session-marking/commit/5712b96e9f12ab697418b0ded8e29ecbf3f40222))
+
 ## [1.5.0](https://github.com/doruksahin/session-marking/compare/session-marking-v1.4.0...session-marking-v1.5.0) (2026-09-13)
 
 
