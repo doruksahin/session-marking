@@ -5,7 +5,6 @@
 
 ### Features
 
-* **session-marking:** configure independent local and host storage ([73121c1](https://github.com/doruksahin/session-marking/commit/73121c1b4991606c1ee2bfe1ab8f917d27de6087))
 * **session-marking:** configure independent local and host storage ([5263611](https://github.com/doruksahin/session-marking/commit/5263611e72f98406b1552261b02295ff51f740f2))
 
 ## [1.4.0](https://github.com/doruksahin/session-marking/compare/session-marking-v1.3.0...session-marking-v1.4.0) (2026-09-13)
