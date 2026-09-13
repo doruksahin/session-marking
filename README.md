@@ -14,28 +14,74 @@ a configured adapter validates and projects that claim into its host.
 
 ## Install
 
-Use Node.js 20 or newer. Register this repository's native marketplaces for each provider you use.
-The installed plugin is user-scoped and can be invoked from any working directory.
+Use Node.js 20 or newer and a Codex or Claude Code installation with plugin support.
+Clone the portable plugin, then register the native marketplace for each provider you use:
 
 ```sh
-codex plugin marketplace add /absolute/path/to/session-marking
-codex plugin add session-marking@session-marking
+git clone https://github.com/doruksahin/session-marking.git
+cd session-marking
 
-claude plugin marketplace add /absolute/path/to/session-marking --scope user
+codex plugin marketplace add "$PWD"
+codex plugin add session-marking@session-marking
+codex plugin list --marketplace session-marking --json
+
+claude plugin marketplace add "$PWD" --scope user
 claude plugin install session-marking@session-marking --scope user
+claude plugin list --json
 ```
 
-The host registers its adapter separately through the public CLI. For adc-vault:
+Check that `session-marking@session-marking` is installed and enabled in each provider's list.
+Keep this checkout in place: the commands register it as a local marketplace. The installed
+plugin is user-scoped and can be invoked from any working directory.
+
+The host registers its adapter separately through the public CLI. With the current adc-vault
+checkout available, run this from the session-marking repository root, replacing the vault path:
 
 ```sh
 node "/absolute/path/to/adc-vault/00 System/Integrations/session-marking/configure.mjs" \
-  --cli /absolute/path/to/session-marking/scripts/session-marking.mjs
+  --cli "$PWD/scripts/session-marking.mjs"
+node "$PWD/scripts/session-marking.mjs" describe
 ```
 
-This writes machine-local adapter configuration only. Rerun it when the adapter checkout moves.
-For another host, follow [the adapter contract](docs/adapter-contract.md#register-and-invoke).
-Existing machine-local claims and configuration remain usable after extraction; see
+`describe` confirms that the configured adapter loads and returns its selection fields without
+marking a session. Configuration is machine-local; rerun setup when the adapter checkout moves.
+The portable plugin does not include the adc-vault adapter. For another host, follow
+[the adapter contract](docs/adapter-contract.md#register-and-invoke).
+
+## Migrate from adc-vault
+
+Install and verify the new marketplace using the steps above before removing the old plugin.
+Run the commands only for providers where `session-marking@adc-vault` is installed:
+
+```sh
+codex plugin remove session-marking@adc-vault
+claude plugin uninstall session-marking@adc-vault --scope user --keep-data
+```
+
+Start a new provider session after changing installed plugins. Existing machine-local adapter
+configuration and immutable session claims remain usable; do not reset either for this migration.
+The plugin name stays `session-marking`; only the marketplace changes. See
 [compatibility](docs/adapter-contract.md#compatibility).
+
+## Update
+
+For the local-checkout installation above, pull the updated source and refresh each provider's
+installed copy. Run these commands from the session-marking repository root:
+
+```sh
+git pull --ff-only
+
+codex plugin remove session-marking@session-marking
+codex plugin add session-marking@session-marking
+codex plugin list --marketplace session-marking --json
+
+claude plugin marketplace update session-marking
+claude plugin update session-marking@session-marking --scope user
+claude plugin list --json
+```
+
+Check the installed version against `package.json`, then start a new provider session. Adapter
+configuration is independent of plugin installation and does not need to be recreated for updates.
 
 ## Use
 

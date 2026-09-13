@@ -46,10 +46,8 @@ lane are owned by [the release configuration](../../release-please-config.json).
 
 ## Planned changes
 
-The draft repository identity is `doruksahin/session-marking`; operator confirmation and remote
-availability are pending. Repository publication, the recorded workspace submodule pin, and provider
-registration migration are rollout steps after review. No additional routing, SDK packages,
-storage backends, or runtime behavior changes are part of this extraction.
+No runtime changes are planned as part of extraction. The architecture owner's extraction SPEC
+tracks rollout work. Additional routing, SDK packages, and storage backends are outside this change.
 
 ## Decisions
 
@@ -58,8 +56,7 @@ The architecture owner maintains the accepted
 and approved
 [extraction SPEC](https://github.com/doruksahin/plugin-architecture/blob/main/decree/spec/architecture/session-marking/spec-01m2czy08rjxnwqw36b95zbtt4-extract-session-marking-and-preserve-the-configured-adapter.md).
 They distinguish the independent repository from the existing runtime component and preserve
-the configured-adapter boundary. These decision links become remotely available when the reviewed
-architecture change is published.
+the configured-adapter boundary.
 
 ## Verification
 

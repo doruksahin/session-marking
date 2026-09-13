@@ -1,5 +1,6 @@
 name: Architecture contract
 on:
+  workflow_dispatch:
   pull_request:
   push:
 permissions:
