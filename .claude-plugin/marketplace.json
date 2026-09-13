@@ -9,7 +9,7 @@
       "name": "session-marking",
       "source": "./",
       "description": "Bind the current agent session to one explicit target through a configured adapter.",
-      "version": "1.4.0",
+      "version": "1.5.0",
       "category": "productivity"
     }
   ]
