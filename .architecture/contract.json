@@ -13,6 +13,7 @@
     ".claude-plugin/marketplace.json",
     "scripts/session-marking.mjs",
     "src/adapter.mjs",
+    "src/local-target.mjs",
     "src/mark.mjs",
     "src/config.mjs",
     "src/paths.mjs",
@@ -34,6 +35,7 @@
     {
       "paths": [
         "src/adapter.mjs",
+        "src/local-target.mjs",
         "src/mark.mjs",
         "src/config.mjs",
         "src/paths.mjs",

@@ -3,7 +3,7 @@ import { realpath } from "node:fs/promises";
 import { loadAdapter, validateProjection, validateResolution } from "./adapter.mjs";
 import { BINDING_SCHEMA_VERSION, createBinding } from "./binding.mjs";
 import { canonicalValue } from "./canonical-json.mjs";
-import { readConfig } from "./config.mjs";
+import { readConfig, selectedAdapterName } from "./config.mjs";
 import { fail } from "./errors.mjs";
 import { canonicalWorkingDirectory } from "./paths.mjs";
 import { currentSession } from "./session.mjs";
@@ -11,7 +11,7 @@ import { claimBinding } from "./store.mjs";
 
 export async function markCurrentSession({ selection, adapterName, environment = process.env, workingDirectory = process.cwd(), now = () => new Date() }) {
   const config = await readConfig({ environment });
-  if (adapterName && adapterName !== config.adapter.name) fail("ADAPTER_MISMATCH", "The requested adapter is not configured.");
+  if (adapterName && adapterName !== selectedAdapterName(config)) fail("ADAPTER_MISMATCH", "The requested adapter is not configured.");
   const adapter = await loadAdapter(config);
   const session = currentSession(environment);
   const workingReal = await realpath(workingDirectory).catch(() => null);
@@ -26,7 +26,9 @@ export async function markCurrentSession({ selection, adapterName, environment =
     workingDirectory: cwd,
   });
   const claim = await claimBinding(desired, { environment });
-  const projection = validateProjection(await adapter.projectBinding(Object.freeze({ binding: claim.binding, context: resolution.context })));
+  const projection = adapter.projectBinding === null
+    ? null
+    : validateProjection(await adapter.projectBinding(Object.freeze({ binding: claim.binding, context: resolution.context })));
   return Object.freeze({
     ok: true,
     adapter: adapter.name,
@@ -34,6 +36,7 @@ export async function markCurrentSession({ selection, adapterName, environment =
     sessionId: claim.binding.session.id,
     sessionUrl: claim.binding.session.url,
     binding: claim.status,
+    bindingPath: claim.targetPath,
     target: claim.binding.target,
     projection,
   });

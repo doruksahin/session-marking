@@ -2,6 +2,7 @@ import { pathToFileURL } from "node:url";
 
 import { canonicalValue } from "./canonical-json.mjs";
 import { exactKeys, fail, plainObject } from "./errors.mjs";
+import * as localTarget from "./local-target.mjs";
 
 const ADAPTER_ERROR_CODE_PATTERN = /^[A-Z][A-Z0-9_]{0,63}$/;
 
@@ -27,6 +28,14 @@ function adapterOperation(operation) {
 }
 
 export async function loadAdapter(config) {
+  if (config.schemaVersion === 2 && config.mode === "local") {
+    return Object.freeze({
+      name: "local",
+      describeSelection: localTarget.describeSelection,
+      resolveTarget: localTarget.resolveTarget,
+      projectBinding: null,
+    });
+  }
   let loaded;
   try { loaded = await import(pathToFileURL(config.adapter.module).href); } catch { fail("ADAPTER_LOAD_FAILED", "The configured session-marking adapter could not be loaded."); }
   if (loaded.adapterApiVersion !== 1 || typeof loaded.describeSelection !== "function" || typeof loaded.resolveTarget !== "function" || typeof loaded.projectBinding !== "function") {

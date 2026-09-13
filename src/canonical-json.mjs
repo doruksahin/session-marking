@@ -12,7 +12,12 @@ function normalize(value, depth) {
   const result = {};
   for (const key of Object.keys(value).sort()) {
     if (!key || key.length > 128) fail("JSON_INVALID", "Structured data contains an invalid key.");
-    result[key] = normalize(value[key], depth + 1);
+    Object.defineProperty(result, key, {
+      value: normalize(value[key], depth + 1),
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    });
   }
   return result;
 }

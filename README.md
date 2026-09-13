@@ -1,8 +1,123 @@
 # session-marking
 
-Portable Codex and Claude Code plugin for explicitly binding the current provider session to one
-operator-selected target. The core stores one immutable, machine-local claim per provider session;
-a configured adapter validates and projects that claim into its host.
+Bind the current Codex or Claude Code session to a project and task. The CLI saves one immutable,
+machine-local binding per provider session. Local mode works immediately; an optional configured
+host adapter can validate its own target fields and publish the same binding into that host.
+
+## Install globally with pnpm
+
+Use Node.js 20 or newer and pnpm. Clone the repository and install the CLI from its root:
+
+```sh
+git clone https://github.com/doruksahin/session-marking.git
+cd session-marking
+pnpm add -g .
+session-marking describe
+```
+
+If pnpm reports that its global bin directory is missing, run `pnpm setup`, reopen your terminal,
+and retry. With no saved configuration, `describe` reports `local` and the required `project` and
+`task` fields. It does not create configuration or mark a session. Existing adapter configuration
+remains active after an update; use [configuration](#configuration) to switch it explicitly.
+
+Start a Codex or Claude Code session in your project and ask that session to run:
+
+```sh
+session-marking mark --selection-json '{"project":"website","task":"fix-login"}'
+```
+
+Supply your own project and task identifiers. Each must be a nonblank string of 1–256 characters
+with no leading or trailing whitespace; both fields are required and extra fields are rejected.
+The command must run with the current provider's session identity in its environment. A regular
+terminal without that identity cannot mark a session, and callers cannot supply an arbitrary
+session ID. The native plugin is optional when calling the CLI directly.
+
+A successful command returns JSON containing the target, binding status, and absolute `bindingPath`.
+That file is the canonical local record. Local mode returns `projection: null` and creates no second
+record store. Repeating the same mark reuses the binding; choosing another target for that session
+fails with `BINDING_CONFLICT`.
+
+Keep the checkout in place. With this local installation, source and version changes take effect
+on the next command invocation. Rerun `pnpm add -g .` if the command name or entry-point path changes.
+Provider-installed plugin copies follow the separate [update steps](#update).
+
+To remove the global command:
+
+```sh
+pnpm remove -g session-marking
+```
+
+## Configuration
+
+New installations use local mode without setup. To switch a previously configured machine back
+to local mode explicitly:
+
+```sh
+session-marking configure --adapter local
+session-marking describe
+```
+
+This explicitly replaces the active external configuration with local mode for subsequent commands.
+Existing immutable bindings remain in place; switching mode does not migrate a bound session, and
+marking it with a different target conflicts.
+Invalid saved configuration produces an error instead of silently switching modes.
+
+Configuration and bindings use the existing platform-specific application directories, independent
+of the source checkout. For a different location, set `SESSION_MARKING_CONFIG_DIR` and/or
+`SESSION_MARKING_STATE_DIR` to absolute directory paths in the environment that runs the CLI or
+provider. Keep those values consistent across invocations: they select which configuration and
+bindings are read. The returned `configPath` and `bindingPath` identify the files actually used.
+[Path resolution](src/paths.mjs) owns the platform and XDG defaults.
+
+### Optional adc-vault integration
+
+The portable plugin does not include the adc-vault adapter. To use your own vault checkout, run
+its setup script from the session-marking repository root, replacing the vault path:
+
+```sh
+node "/absolute/path/to/adc-vault/00 System/Integrations/session-marking/configure.mjs" \
+  --cli "$PWD/scripts/session-marking.mjs"
+session-marking describe
+```
+
+The configured adapter now supplies the selection fields. For an existing selected packet and stage,
+run this inside the current provider session:
+
+```sh
+session-marking mark --selection-json '{"jiraKey":"ATT-5400","stageId":"implementation"}'
+```
+
+The core saves the canonical local binding, then the selected adapter publishes its vault record.
+A command uses one mode and does not broadcast to multiple adapters. Jira fields are accepted by
+the vault adapter; local mode expects `project` and `task`. Rerun setup when the adapter checkout
+moves. Other integrations use [the adapter contract](docs/adapter-contract.md#register-and-invoke).
+
+## Install
+
+The optional native plugin lets you invoke `$session-marking` in Codex or `/session-marking` in
+Claude Code. Use a provider installation with plugin support. From this repository root, register
+the marketplace for the provider you use.
+
+For Codex:
+
+```sh
+codex plugin marketplace add "$PWD"
+codex plugin add session-marking@session-marking
+codex plugin list --marketplace session-marking --json
+```
+
+For Claude Code:
+
+```sh
+claude plugin marketplace add "$PWD" --scope user
+claude plugin install session-marking@session-marking --scope user
+claude plugin list --json
+```
+
+Check that `session-marking@session-marking` is installed and enabled. Keep this checkout in place:
+these commands register it as a local marketplace. The installed plugin is user-scoped and can be
+invoked from any working directory. It uses the same configuration, local default, and marking
+implementation as the global CLI.
 
 ## Guarantees
 
@@ -11,76 +126,6 @@ a configured adapter validates and projects that claim into its host.
 - Repeating the winning claim is idempotent and can repair a failed host projection.
 - Host-specific selection and record rules remain behind the adapter boundary.
 - There is no prompt-submit hook, global active target, or future-session arming state.
-
-## Install
-
-Use Node.js 20 or newer and a Codex or Claude Code installation with plugin support.
-Clone the portable plugin, then register the native marketplace for each provider you use:
-
-```sh
-git clone https://github.com/doruksahin/session-marking.git
-cd session-marking
-
-codex plugin marketplace add "$PWD"
-codex plugin add session-marking@session-marking
-codex plugin list --marketplace session-marking --json
-
-claude plugin marketplace add "$PWD" --scope user
-claude plugin install session-marking@session-marking --scope user
-claude plugin list --json
-```
-
-Check that `session-marking@session-marking` is installed and enabled in each provider's list.
-Keep this checkout in place: the commands register it as a local marketplace. The installed
-plugin is user-scoped and can be invoked from any working directory.
-
-The host registers its adapter separately through the public CLI. With the current adc-vault
-checkout available, run this from the session-marking repository root, replacing the vault path:
-
-```sh
-node "/absolute/path/to/adc-vault/00 System/Integrations/session-marking/configure.mjs" \
-  --cli "$PWD/scripts/session-marking.mjs"
-node "$PWD/scripts/session-marking.mjs" describe
-```
-
-`describe` confirms that the configured adapter loads and returns its selection fields without
-marking a session. Configuration is machine-local; rerun setup when the adapter checkout moves.
-The portable plugin does not include the adc-vault adapter. For another host, follow
-[the adapter contract](docs/adapter-contract.md#register-and-invoke).
-
-## Install globally with pnpm
-
-To run `session-marking` from any directory, install the CLI from your local checkout.
-After cloning the repository, run this from its root:
-
-```sh
-pnpm add -g .
-```
-
-If pnpm reports that its global bin directory is missing, run `pnpm setup`, reopen your
-terminal, and retry. Node.js 20 or newer is required.
-
-Complete the adapter configuration in [Install](#install), then verify the global command:
-
-```sh
-session-marking describe
-```
-
-The command supports the same `configure`, `describe`, and `mark` operations as the Node.js
-script. `mark` must run with the current Codex or Claude Code session identity in its environment;
-a regular terminal without that identity cannot mark a session. Installing the global CLI does
-not register the Codex or Claude Code skill; use the provider installation steps above for that.
-
-Keep the checkout in place. With this local installation, source and version changes take effect
-on the next command invocation; no reload or reinstall is needed. Rerun `pnpm add -g .` if the
-command name or entry-point path changes. Provider-installed plugin copies still follow the
-separate [update steps](#update).
-
-To remove the global command:
-
-```sh
-pnpm remove -g session-marking
-```
 
 ## Migrate from adc-vault
 
@@ -114,13 +159,15 @@ claude plugin update session-marking@session-marking --scope user
 claude plugin list --json
 ```
 
-Check the installed version against `package.json`, then start a new provider session. Adapter
-configuration is independent of plugin installation and does not need to be recreated for updates.
+Use only the commands for your installed providers. Check the installed version against
+`package.json`, then start a new provider session. Configuration is independent of plugin
+installation and does not need to be recreated for updates.
 
 ## Use
 
 Invoke `$session-marking` in Codex or `/session-marking` in Claude Code and provide the target fields
-requested by the configured adapter. The adapter owns how the selected target appears in its host.
+reported by `describe`: `project` and `task` for local mode, or the configured host's fields.
+The skill invokes the same CLI and reports its saved binding and any host projection.
 
 ## Develop
 
