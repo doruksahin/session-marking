@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/doruksahin/session-marking/compare/f542ca3a4d4fac850edf6990c15578b8d7bbf5c7...session-marking-v1.3.0) (2026-09-13)
+
+
+### Features
+
+* **cli:** expose global session-marking command ([ad282ef](https://github.com/doruksahin/session-marking/commit/ad282ef0b3d46584e5d20f6361c22f6536494fc9))
+
 ## [1.2.0](https://github.com/doruksahin/adcreative-obsidian-work-os/compare/session-marking-v1.1.1...session-marking-v1.2.0) (2026-08-31)
 
 
