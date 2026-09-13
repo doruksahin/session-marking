@@ -5,7 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { loadAdapter, validateDescription } from "../src/adapter.mjs";
-import { configureAdapter, configureLocal, readConfig, selectedAdapterName } from "../src/config.mjs";
+import { configureAdapter, configureLocal, initializeConfig, readConfig, selectedAdapterName } from "../src/config.mjs";
 import { SessionMarkError, fail } from "../src/errors.mjs";
 import { markCurrentSession } from "../src/mark.mjs";
 
@@ -30,13 +30,17 @@ export async function runCli({ argv = process.argv.slice(2), environment = proce
   const command = argv[0];
   if (command === "configure") {
     const values = argumentMap(argv.slice(1), ["--adapter", "--module"]);
+    if (argv.length === 1) {
+      const result = await initializeConfig({ environment });
+      return Object.freeze({ ok: true, configPath: result.configPath, config: result.config });
+    }
     if (values["--adapter"] === "local" && !values["--module"]) {
       const result = await configureLocal({ environment });
       return Object.freeze({ ok: true, adapter: "local", configPath: result.configPath });
     }
     if (!values["--adapter"] || !values["--module"]) fail("ARGUMENT_INVALID", "Usage: session-marking configure --adapter local | --adapter <name> --module <absolute-path>");
     const result = await configureAdapter({ name: values["--adapter"], modulePath: values["--module"], environment });
-    return Object.freeze({ ok: true, adapter: result.config.adapter.name, module: result.config.adapter.module, configPath: result.configPath });
+    return Object.freeze({ ok: true, adapter: result.config.host.name, module: result.config.host.module, configPath: result.configPath });
   }
   if (command === "describe") {
     const values = argumentMap(argv.slice(1), ["--adapter"]);

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, readdir, realpath, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -55,7 +55,7 @@ async function configureExternal(item, name = "fixture") {
     "export const adapterApiVersion = 1;",
     "export function describeSelection() { return { type: 'object', required: ['work'] }; }",
     "export function resolveTarget({ selection }) { return { target: { work: selection.work }, context: {} }; }",
-    `export async function projectBinding({ binding }) { await writeFile(${JSON.stringify(projectionPath)}, JSON.stringify(binding)); return { status: 'projected' }; }`,
+    `export async function projectBinding(input) { const { binding, bindingPersisted = true } = input; const expected = bindingPersisted ? ['binding', 'context'] : ['binding', 'bindingPersisted', 'context']; if (JSON.stringify(Object.keys(input).sort()) !== JSON.stringify(expected)) throw Error('unexpected projection fields'); await writeFile(${JSON.stringify(projectionPath)}, JSON.stringify(binding)); return { status: 'projected', bindingPersisted }; }`,
   ].join("\n"));
   await configureAdapter({ name, modulePath, environment: item.environment });
   return projectionPath;
@@ -70,6 +70,7 @@ for (const provider of ["codex", "claude-code"]) {
     assert.equal(result.provider, provider);
     assert.equal(result.binding, "created");
     assert.equal(result.bindingPath, bindingPath);
+    assert.deepEqual(result.local, { bindingPath });
     assert.equal(result.projection, null);
     assert.deepEqual(result.target, { kind: "local/project-task-v1", project: "website", task: "fix-login" });
     assert.deepEqual(await filesBelow(item.root), [bindingPath]);
@@ -132,7 +133,7 @@ test("an external adapter named local still projects exactly its own target and 
   const projectionPath = await configureExternal(item, "local");
   const result = await mark(item, { work: "host-task" }, sessionEnvironment(item), ["--adapter", "local"]);
   assert.deepEqual(result.target, { work: "host-task" });
-  assert.deepEqual(result.projection, { status: "projected" });
+  assert.deepEqual(result.projection, { status: "projected", bindingPersisted: true });
   const canonical = JSON.parse(await readFile(result.bindingPath, "utf8"));
   assert.deepEqual(JSON.parse(await readFile(projectionPath, "utf8")), canonical);
   assert.deepEqual(await filesBelow(item.environment.SESSION_MARKING_STATE_DIR), [result.bindingPath]);
@@ -176,4 +177,88 @@ test("switching mode preserves existing bindings and never broadcasts to the for
   await assert.rejects(mark(item, { work: "host-task" }, sessionEnvironment(item, "codex", "new-session")), { code: "BINDING_CONFLICT" });
   assert.equal(await readFile(local.bindingPath, "utf8"), localClaim);
   assert.equal(await readFile(projectionPath, "utf8"), originalProjection);
+});
+
+for (const provider of ["codex", "claude-code"]) {
+  test(`${provider} disabling local leaves its existing binding untouched and gives the host a fresh candidate`, async (t) => {
+    const item = await fixture(t);
+    const projectionPath = await configureExternal(item);
+    const environment = sessionEnvironment(item, provider, "shared-output");
+    const selection = { work: "host-task" };
+    const result = await mark(item, selection, environment, ["--adapter", "fixture"]);
+    assert.deepEqual(result.local, { bindingPath: result.bindingPath });
+    assert.equal(result.projection.bindingPersisted, true);
+    assert.deepEqual(result.target, { work: "host-task" });
+    const original = await readFile(result.bindingPath, "utf8");
+    assert.deepEqual(JSON.parse(await readFile(projectionPath, "utf8")), JSON.parse(original));
+
+    const configPath = path.join(item.environment.SESSION_MARKING_CONFIG_DIR, "config.json");
+    const config = JSON.parse(await readFile(configPath, "utf8"));
+    config.local.enabled = false;
+    await writeFile(configPath, JSON.stringify(config));
+    await rm(projectionPath);
+    const retry = await mark(item, selection, environment);
+    assert.equal(retry.local, null);
+    assert.equal(retry.binding, null);
+    assert.equal(retry.bindingPath, null);
+    assert.equal(retry.projection.bindingPersisted, false);
+    assert.deepEqual(JSON.parse(await readFile(projectionPath, "utf8")).target, JSON.parse(original).target);
+    assert.equal(await readFile(result.bindingPath, "utf8"), original);
+    assert.deepEqual((await mark(item, { work: "other-task" }, environment)).target, { work: "other-task" });
+    await assert.rejects(mark(item, selection, environment, ["--adapter", "local"]), { code: "ADAPTER_MISMATCH" });
+    assert.deepEqual(await filesBelow(item.environment.SESSION_MARKING_STATE_DIR), [result.bindingPath]);
+  });
+}
+
+test("host-only projection failure creates no local claim and a later invocation can retry the host", async (t) => {
+  const item = await fixture(t);
+  const projectionPath = await configureExternal(item);
+  const configPath = path.join(item.environment.SESSION_MARKING_CONFIG_DIR, "config.json");
+  const config = JSON.parse(await readFile(configPath, "utf8"));
+  config.local.enabled = false;
+  await writeFile(configPath, JSON.stringify(config));
+  await mkdir(projectionPath);
+  const selection = { work: "repair-task" };
+  await assert.rejects(mark(item, selection), { code: "EISDIR" });
+  await assert.rejects(stat(item.environment.SESSION_MARKING_STATE_DIR), { code: "ENOENT" });
+  await rm(projectionPath, { recursive: true });
+  const result = await mark(item, selection);
+  assert.equal(result.binding, null);
+  assert.equal(result.bindingPath, null);
+  assert.equal(result.local, null);
+  assert.equal(result.projection.bindingPersisted, false);
+  assert.deepEqual(JSON.parse(await readFile(projectionPath, "utf8")).target, result.target);
+  await assert.rejects(stat(item.environment.SESSION_MARKING_STATE_DIR), { code: "ENOENT" });
+});
+
+test("host-only marking never reads or writes a disabled local store, including unsafe paths", async (t) => {
+  const item = await fixture(t);
+  await configureExternal(item);
+  const configPath = path.join(item.environment.SESSION_MARKING_CONFIG_DIR, "config.json");
+  const config = JSON.parse(await readFile(configPath, "utf8"));
+  config.local.enabled = false;
+  const missing = path.join(item.root, "missing-local");
+  const actual = path.join(item.root, "actual-local");
+  const linked = path.join(item.root, "linked-local");
+  await mkdir(actual);
+  await symlink(actual, linked);
+  const blocked = path.join(item.root, "file-local");
+  await writeFile(blocked, "keep me unchanged");
+  for (const directory of [missing, linked, blocked]) {
+    config.local.directory = directory;
+    await writeFile(configPath, JSON.stringify(config));
+    const environment = sessionEnvironment(item);
+    delete environment.SESSION_MARKING_STATE_DIR;
+    const result = await mark(item, { work: "host-task" }, environment);
+    assert.equal(result.binding, null);
+    assert.equal(result.bindingPath, null);
+    assert.equal(result.local, null);
+    assert.equal(result.projection.bindingPersisted, false);
+  }
+  const result = await mark(item, { work: "host-task" }, { ...sessionEnvironment(item), SESSION_MARKING_STATE_DIR: "relative-and-unused" });
+  assert.equal(result.local, null);
+  await assert.rejects(stat(missing), { code: "ENOENT" });
+  assert.deepEqual(await readdir(actual), []);
+  assert.equal(await readFile(blocked, "utf8"), "keep me unchanged");
+  await assert.rejects(stat(item.environment.SESSION_MARKING_STATE_DIR), { code: "ENOENT" });
 });

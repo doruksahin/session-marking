@@ -28,7 +28,7 @@ function adapterOperation(operation) {
 }
 
 export async function loadAdapter(config) {
-  if (config.schemaVersion === 2 && config.mode === "local") {
+  if (!config.host.enabled) {
     return Object.freeze({
       name: "local",
       describeSelection: localTarget.describeSelection,
@@ -37,12 +37,12 @@ export async function loadAdapter(config) {
     });
   }
   let loaded;
-  try { loaded = await import(pathToFileURL(config.adapter.module).href); } catch { fail("ADAPTER_LOAD_FAILED", "The configured session-marking adapter could not be loaded."); }
+  try { loaded = await import(pathToFileURL(config.host.module).href); } catch { fail("ADAPTER_LOAD_FAILED", "The configured session-marking adapter could not be loaded."); }
   if (loaded.adapterApiVersion !== 1 || typeof loaded.describeSelection !== "function" || typeof loaded.resolveTarget !== "function" || typeof loaded.projectBinding !== "function") {
     fail("ADAPTER_INVALID", "The configured session-marking adapter does not implement API version 1.");
   }
   return Object.freeze({
-    name: config.adapter.name,
+    name: config.host.name,
     describeSelection: adapterOperation(loaded.describeSelection),
     resolveTarget: adapterOperation(loaded.resolveTarget),
     projectBinding: adapterOperation(loaded.projectBinding),

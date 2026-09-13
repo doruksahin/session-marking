@@ -7,6 +7,7 @@
   "document": "docs/architecture/README.md",
   "sourcePaths": [
     "package.json",
+    "config.defaults.json",
     ".codex-plugin/plugin.json",
     ".claude-plugin/plugin.json",
     ".agents/plugins/marketplace.json",
