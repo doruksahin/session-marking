@@ -1,0 +1,22 @@
+name: Architecture contract
+on:
+  pull_request:
+  push:
+permissions:
+  contents: read
+jobs:
+  architecture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python3 .architecture/check.py
+      - name: Check agent and architecture documentation links
+        uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
+        with:
+          lycheeVersion: v0.24.2
+          args: >-
+            --config .lychee.toml --offline --root-dir "${{ github.workspace }}"
+            './*.md' './docs/**/*.md' './.architecture/**/*.md'

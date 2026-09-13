@@ -2,62 +2,53 @@
 
 Portable Codex and Claude Code plugin for explicitly binding the current provider session to one
 operator-selected target. The core stores one immutable, machine-local claim per provider session;
-a configured adapter validates and projects that claim into a host system such as adc-vault.
+a configured adapter validates and projects that claim into its host.
 
 ## Guarantees
 
 - The provider supplies the current session identity; callers cannot override it.
-- Different sessions can be marked concurrently.
-- Competing claims for one session have exactly one winner.
+- Different sessions can be marked concurrently. Competing claims for one session have one winner.
 - Repeating the winning claim is idempotent and can repair a failed host projection.
-- The package contains no prompt-submit hook, global active target, or future-session arming state.
-- Host-specific task, stage, and record rules remain behind the adapter boundary.
+- Host-specific selection and record rules remain behind the adapter boundary.
+- There is no prompt-submit hook, global active target, or future-session arming state.
 
 ## Install
 
-Clone the repository once, then register its native marketplaces for each provider that a colleague
-uses. The installed plugin is user-scoped and can be invoked from any working directory.
+Use Node.js 20 or newer. Register this repository's native marketplaces for each provider you use.
+The installed plugin is user-scoped and can be invoked from any working directory.
 
 ```sh
-git clone https://github.com/AdCreative-ai/adcreative-obsidian-work-os.git adc-vault
+codex plugin marketplace add /absolute/path/to/session-marking
+codex plugin add session-marking@session-marking
 
-codex plugin marketplace add /absolute/path/to/adc-vault
-codex plugin add session-marking@adc-vault
-
-claude plugin marketplace add /absolute/path/to/adc-vault --scope user
-claude plugin install session-marking@adc-vault --scope user
+claude plugin marketplace add /absolute/path/to/session-marking --scope user
+claude plugin install session-marking@session-marking --scope user
 ```
 
-The host registers its adapter separately. For adc-vault:
+The host registers its adapter separately through the public CLI. For adc-vault:
 
 ```sh
-cd /absolute/path/to/adc-vault
-node "00 System/Integrations/session-marking/configure.mjs"
+node "/absolute/path/to/adc-vault/00 System/Integrations/session-marking/configure.mjs" \
+  --cli /absolute/path/to/session-marking/scripts/session-marking.mjs
 ```
 
-This writes machine-local adapter configuration only. Rerun it if the host checkout moves.
+This writes machine-local adapter configuration only. Rerun it when the adapter checkout moves.
+For another host, follow [the adapter contract](docs/adapter-contract.md#register-and-invoke).
+Existing machine-local claims and configuration remain usable after extraction; see
+[compatibility](docs/adapter-contract.md#compatibility).
 
 ## Use
 
 Invoke `$session-marking` in Codex or `/session-marking` in Claude Code and provide the target fields
-requested by the configured adapter. The adc-vault adapter requests a Jira key and a direct packet
-stage slug, then publishes a packet-owned session record.
+requested by the configured adapter. The adapter owns how the selected target appears in its host.
 
 ## Develop
 
-```sh
-cd plugins/session-marking
-npm run verify
-```
+Run `npm run verify` at this repository root. No dependency installation or host checkout is needed;
+all runtime dependencies are Node.js built-ins and tests use temporary adapters and state.
+CI exercises Linux and macOS on Node.js 20 and 24. Architecture verification runs
+`python3 .architecture/check.py`; Python 3.11 or newer is required for that separate check.
 
-`package.json` owns the plugin version. `npm run sync:version` copies it into both provider manifests
-and any explicitly supplied host marketplace. Release Please publishes component-qualified
-`session-marking-vX.Y.Z` tags independently of the host repository's root version.
-
-## References
-
-- [OpenAI plugins](https://learn.chatgpt.com/docs/build-plugins)
-- [OpenAI Agent Skills](https://learn.chatgpt.com/docs/build-skills)
-- [Claude Code plugins](https://code.claude.com/docs/en/plugins)
-- [Release Please manifest releases](https://github.com/googleapis/release-please/blob/main/docs/manifest-releaser.md)
-
+See [the architecture guide](docs/architecture/README.md) for ownership and interfaces,
+[the release guide](docs/release.md) for versioning, and
+[extraction provenance](docs/extraction.md) for the retained Git history.

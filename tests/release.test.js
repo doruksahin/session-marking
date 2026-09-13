@@ -48,3 +48,30 @@ test("invalid release metadata fails before any mirror is changed", async (t) =>
   assert.throws(() => syncVersionMirrors({ pluginRoot: item.plugin, marketplacePaths: [path.join(item.root, ".claude-plugin", "marketplace.json")] }), /marketplace entry/);
   assert.equal(await readFile(codexPath, "utf8"), before);
 });
+
+test("native marketplaces resolve to this plugin root and the release lane owns its version mirrors", async () => {
+  const readJson = async (name) => JSON.parse(await readFile(path.join(pluginRoot, name), "utf8"));
+  const metadata = await readJson("package.json");
+  const codex = await readJson(".agents/plugins/marketplace.json");
+  const claude = await readJson(".claude-plugin/marketplace.json");
+  for (const marketplace of [codex, claude]) {
+    assert.equal(marketplace.name, metadata.name);
+    assert.equal(marketplace.plugins.length, 1);
+    assert.equal(marketplace.plugins[0].name, metadata.name);
+  }
+  assert.equal(codex.plugins[0].source.source, "local");
+  assert.equal(path.resolve(pluginRoot, codex.plugins[0].source.path), pluginRoot);
+  assert.equal(path.resolve(pluginRoot, claude.plugins[0].source), pluginRoot);
+  assert.deepEqual(verifyVersionMirrors({ marketplacePaths: [path.join(pluginRoot, ".claude-plugin/marketplace.json")] }), { version: metadata.version, files: 3 });
+  const release = await readJson("release-please-config.json");
+  assert.deepEqual(Object.keys(release.packages), ["."]);
+  assert.equal(release.packages["."].component, metadata.name);
+  assert.equal(release.packages["."]["release-type"], "node");
+  assert.equal(release.packages["."]["include-component-in-tag"], true);
+  assert.deepEqual(release.packages["."]["extra-files"], [
+    { type: "json", path: ".codex-plugin/plugin.json", jsonpath: "$.version" },
+    { type: "json", path: ".claude-plugin/plugin.json", jsonpath: "$.version" },
+    { type: "json", path: ".claude-plugin/marketplace.json", jsonpath: "$.plugins[0].version" },
+  ]);
+  assert.deepEqual(await readJson(".release-please-manifest.json"), { ".": metadata.version });
+});

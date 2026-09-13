@@ -1,0 +1,9 @@
+# Agent entrypoints and architecture documentation: files and heading fragments.
+# CI passes --offline; authenticated maintainers check cross-repository links online.
+no_progress = true
+format = "detailed"
+include_fragments = "anchor-only"
+include_verbatim = false
+include_mail = false
+max_retries = 2
+timeout = 20

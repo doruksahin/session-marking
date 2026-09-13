@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "id": "session-marking-plugin",
+  "kind": "plugin",
+  "repository": "https://github.com/doruksahin/session-marking",
+  "owner": "doruksahin",
+  "document": "docs/architecture/README.md",
+  "sourcePaths": [
+    "package.json",
+    ".codex-plugin/plugin.json",
+    ".claude-plugin/plugin.json",
+    ".agents/plugins/marketplace.json",
+    ".claude-plugin/marketplace.json",
+    "scripts/session-marking.mjs",
+    "src/adapter.mjs",
+    "src/mark.mjs",
+    "src/config.mjs",
+    "src/paths.mjs",
+    "src/binding.mjs",
+    "src/store.mjs",
+    "tests/boundary.test.js",
+    "tests/session-marking.test.js",
+    "tests/release.test.js",
+    "release-please-config.json",
+    "docs/adapter-contract.md"
+  ],
+  "dependencyChecks": [
+    {
+      "manifest": "package.json",
+      "allowedInternalPackages": []
+    }
+  ],
+  "boundaryChecks": [
+    {
+      "paths": [
+        "src/adapter.mjs",
+        "src/mark.mjs",
+        "src/config.mjs",
+        "src/paths.mjs",
+        "scripts/session-marking.mjs",
+        "skills/session-marking/SKILL.md"
+      ],
+      "forbidden": [
+        "adc-vault",
+        "10 Tasks/Packets",
+        "validatePacketStage",
+        "session-record.mjs"
+      ]
+    }
+  ]
+}
