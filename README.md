@@ -1,8 +1,8 @@
 # session-marking
 
-Bind the current Codex or Claude Code session to a project and task. By default, the CLI saves one
-immutable local record per session. An optional host integration can validate its own target fields
-and publish a record in that host.
+Bind a Codex or Claude Code session to a project and task. By default, the CLI saves one
+immutable local record per session. An optional host integration validates the target for its
+destination and publishes a record there.
 
 **New here? Start with [global CLI installation](docs/installation.md#global-cli-with-pnpm), then
 [mark your first session](docs/cli.md#mark-your-first-session).** Local use needs no host integration.
@@ -31,7 +31,7 @@ complete file, destination switches, and storage paths.
 ### Optional adc-vault integration
 
 Follow the [adc-vault setup guide](docs/integrations/adc-vault.md) when marking a Jira packet stage.
-The host resolves one target for both enabled destinations.
+Use the same `project`, `task`, and optional `stageId` fields for every destination.
 
 ## Install
 
@@ -40,8 +40,8 @@ For `$session-marking` in Codex or `/session-marking` in Claude Code, follow
 
 ## Guarantees
 
-The provider supplies the current session identity. Local storage, when enabled, keeps the first
-binding and rejects a different target for that session. Enabled hosts own their records; destinations
+Use the current provider environment or [an explicit session identity](docs/cli.md#session-identity).
+Local storage, when enabled, keeps the first binding and rejects a different target for that session. Enabled hosts own their records; destinations
 are not synchronized. There is no prompt-submit hook or future-session arming state.
 See [marking and retries](docs/cli.md#mark) and [destination behavior](docs/configuration.md#destinations).
 

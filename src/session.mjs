@@ -14,7 +14,7 @@ export function sessionUrl(provider, sessionId) {
   return provider === "codex" ? `codex://threads/${sessionId}` : null;
 }
 
-export function currentSession(environment) {
+function currentSession(environment) {
   const threadId = environment.CODEX_THREAD_ID;
   const codexId = environment.CODEX_SESSION_ID;
   const claudeId = environment.CLAUDE_CODE_SESSION_ID;
@@ -35,4 +35,12 @@ export function currentSession(environment) {
     return Object.freeze({ provider: "claude-code", id: claudeId, url: null });
   }
   fail("SESSION_ID_UNAVAILABLE", "No supported provider supplied a canonical current-session identity.");
+}
+
+export function resolveSession({ provider, sessionId, environment = process.env } = {}) {
+  if (provider === undefined && sessionId === undefined) return currentSession(environment);
+  if (provider === undefined || sessionId === undefined) fail("ARGUMENT_INVALID", "Supply --provider and --session-id together, or omit both to use the current session.");
+  validateProvider(provider, "ARGUMENT_INVALID");
+  if (typeof sessionId !== "string" || !SESSION_ID_PATTERN.test(sessionId)) fail("ARGUMENT_INVALID", "The explicit session ID is not canonical.");
+  return Object.freeze({ provider, id: sessionId, url: sessionUrl(provider, sessionId) });
 }

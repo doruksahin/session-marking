@@ -10,7 +10,7 @@ session-marking configure
 
 The command returns `configPath` and the effective configuration. It creates the user file only
 when missing; an existing file is validated and shown without being rewritten. Edit the returned
-file. Every command reads it again, so changes apply on the next invocation.
+file. Changes apply on the next command that uses configuration; help does not read it.
 
 [config.defaults.json](../config.defaults.json) is the shipped defaults source. The complete default is:
 
@@ -32,9 +32,9 @@ file. Every command reads it again, so changes apply on the next invocation.
 | Field | Meaning |
 | --- | --- |
 | `schemaVersion` | Required; use `3` for this format |
-| `local.enabled` | Whether to read and persist the local session binding |
+| `local.enabled` | Whether marking reads and persists the local session binding |
 | `local.directory` | Absolute local store directory; `null` uses the platform default |
-| `host.enabled` | Whether to resolve and project through the host adapter |
+| `host.enabled` | Whether to validate and project through the host adapter |
 | `host.name` | Adapter name; required when the host is enabled |
 | `host.module` | Absolute adapter module path; required when the host is enabled |
 
@@ -53,11 +53,12 @@ to an existing regular file. Registration through [configure](cli.md#configure) 
 | `false` | `true` | Project through the host without accessing the local store |
 | `false` | `false` | Configuration error |
 
-The enabled host supplies the selection fields and resolves one target. Otherwise, built-in local
-selection does so. Both enabled destinations receive the same binding; enabling local alongside a
-host does not require a second selection. See [mark](cli.md#mark) for fields and returned results.
+The core validates `project`, `task`, and optional `stageId`. An enabled host can require `stageId`
+and validate the target for its destination. Both enabled destinations receive the same binding;
+enabling local alongside a host does not require a second selection. See [mark](cli.md#mark) for fields and returned results.
 
-With local disabled, the CLI performs no local binding reads or writes and creates no hidden receipt.
+With local disabled, marking performs no local binding reads or writes and creates no hidden receipt.
+[Listing](cli.md#list) can still read existing local records.
 The host owns persistence and retry behavior. Existing records remain untouched while their
 destination is disabled. Changing configuration does not synchronize records between destinations.
 
@@ -97,7 +98,7 @@ Version-1 external adapter configuration remains readable as local plus host ena
 local configuration remains readable as local enabled and host disabled. Reads do not rewrite either
 format; explicit configuration writes use version 3.
 
-Existing binding schema version 2 and target identities remain unchanged. Moving or updating the
-source checkout does not require a state reset. Reregister a host when its module moves; explicit
+Binding schema version 2 remains the saved record format, and its storage path is independent of
+the source checkout. Reregister a host when its module moves; explicit
 registration or local setup can replace or disable a moved host without loading its old module.
 For adapter authors, see [the API compatibility contract](adapter-contract.md#compatibility).

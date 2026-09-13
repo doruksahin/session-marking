@@ -26,9 +26,9 @@ async function fixture(t) {
 async function externalModule(root) {
   const modulePath = path.join(root, "adapter.mjs");
   await writeFile(modulePath, [
-    "export const adapterApiVersion = 1;",
-    "export function describeSelection() { return { external: true }; }",
-    "export function resolveTarget({ selection }) { return { target: { external: selection.work }, context: {} }; }",
+    "export const adapterApiVersion = 2;",
+    "export function describeRequirements() { return { required: [], description: 'External fixture.' }; }",
+    "export function prepareBinding() { return { context: {} }; }",
     "export function projectBinding() { return { status: 'external' }; }",
   ].join("\n"));
   return modulePath;
@@ -110,11 +110,12 @@ test("an external adapter named local remains an external integration", async (t
   assert.deepEqual(await readConfig({ environment: item.environment }), {
     schemaVersion: 3, local: { enabled: true, directory: null }, host: { enabled: true, name: "local", module: modulePath },
   });
-  assert.deepEqual(await item.cli(["describe", "--adapter", "local"]), {
-    ok: true, adapter: "local", selection: { external: true },
-  });
-  const marked = await item.cli(["mark", "--adapter", "local", "--selection-json", '{"work":"external-task"}'], "external-local");
-  assert.deepEqual(marked.target, { external: "external-task" });
+  const described = await item.cli(["describe", "--adapter", "local"]);
+  assert.equal(described.adapter, "local");
+  assert.equal(described.selection.description, "External fixture.");
+  assert.deepEqual(described.selection.required, ["project", "task"]);
+  const marked = await item.cli(["mark", "--adapter", "local", "--selection-json", '{"project":"website","task":"external-task"}'], "external-local");
+  assert.deepEqual(marked.target, { kind: "session-marking/target-v1", project: "website", task: "external-task" });
   assert.deepEqual(marked.projection, { status: "external" });
 });
 
@@ -141,7 +142,7 @@ test("switching between local and external configuration preserves immutable ses
   const localRecord = await readFile(localPath, "utf8");
   const modulePath = await externalModule(item.root);
   await item.cli(["configure", "--adapter", "fixture", "--module", modulePath]);
-  const externalArgs = ["mark", "--selection-json", '{"work":"external-task"}'];
+  const externalArgs = ["mark", "--selection-json", '{"project":"website","task":"external-task"}'];
   assert.equal((await item.cli(externalArgs, "external-session")).binding, "created");
   const externalPath = path.join(item.environment.SESSION_MARKING_STATE_DIR, "bindings", "codex", "external-session.json");
   const externalRecord = await readFile(externalPath, "utf8");
@@ -304,7 +305,7 @@ test("missing, partial, and legacy local directory settings use the existing pla
       await writeFile(item.configPath, JSON.stringify(config));
     }
     const sessionId = `fallback-${index}`;
-    const selection = config?.schemaVersion === 1 ? '{"work":"external-task"}' : '{"project":"website","task":"fix-login"}';
+    const selection = config?.schemaVersion === 1 ? '{"project":"website","task":"external-task"}' : '{"project":"website","task":"fix-login"}';
     const marked = await item.cli(["mark", "--selection-json", selection], sessionId);
     assert.equal(marked.bindingPath, path.join(stateDirectory(item.environment), "bindings", "codex", `${sessionId}.json`));
     assert.equal((await readConfig({ environment: item.environment })).local.directory, null);

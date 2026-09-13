@@ -2,7 +2,7 @@
 
 [Start here](../../README.md) · Settings: [configuration](../configuration.md) · Commands: [CLI guide](../cli.md)
 
-Use this integration to associate the current session with an existing adc-vault packet and an
+Use this integration to associate a session with an existing adc-vault packet and an
 operator-selected stage. The adapter lives in your vault checkout; it is not bundled with this plugin.
 Local use remains available without a vault.
 
@@ -18,7 +18,7 @@ session-marking describe
 ```
 
 The helper registers the vault-owned `adapter.mjs` and returns its module path and your `configPath`.
-`describe` should now name `adc-vault` and require `jiraKey` and `stageId`.
+`describe` should now name `adc-vault` and require `project`, `task`, and `stageId`.
 Pass the actual `scripts/session-marking.mjs` file to `--cli`: the helper executes it with Node.js,
 so a pnpm shell shim returned by `command -v session-marking` is not a substitute.
 
@@ -31,24 +31,27 @@ enabled, so both destinations will receive the resolved binding. Edit the return
 Choose an existing packet and its stage. Inside the current Codex or Claude Code session, run:
 
 ```sh
-session-marking mark --selection-json '{"jiraKey":"ATT-5400","stageId":"implementation"}'
+session-marking mark --selection-json '{"project":"adcreative","task":"ATT-5400","stageId":"implementation"}'
 ```
 
-Replace the example key and stage with your selection. The vault validates the packet and its direct
-stage folder. It resolves the target as:
+Use project `adcreative`, a canonical Jira key as `task`, and your selected `stageId`. The vault
+validates the existing packet and its direct stage folder. The core target saved locally is:
 
 ```json
 {
-  "kind": "adc-vault/packet-stage-v1",
-  "workspace": "adcreative",
-  "jiraKey": "ATT-5400",
+  "kind": "session-marking/target-v1",
+  "project": "adcreative",
+  "task": "ATT-5400",
   "stageId": "implementation"
 }
 ```
 
-The field names belong to this host resolver. Built-in local selection uses `project` and `task`;
-enabling local storage alongside adc-vault does not invoke that second resolver or require another
-selection. The one target above is used for both enabled destinations.
+The same input works with local storage alone. Enabling adc-vault adds its destination validation:
+project `adcreative`, a canonical Jira task key, and an existing packet stage. The adapter maps
+`task` to the vault's `jiraKey`; both enabled destinations receive the same core binding.
+For a known session outside the current environment, supply [explicit identity flags](../cli.md#session-identity).
+An optional [`--description`](../cli.md#mark) is saved in the local binding and the vault session
+record as the session's work description.
 
 ## Find the results
 

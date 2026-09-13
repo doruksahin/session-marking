@@ -6,7 +6,7 @@ import test from "node:test";
 
 import { runCli } from "../scripts/session-marking.mjs";
 import { configureAdapter } from "../src/config.mjs";
-import { markCurrentSession } from "../src/mark.mjs";
+import { markSession } from "../src/mark.mjs";
 
 async function fixture(t) {
   const root = await realpath(await mkdtemp(path.join(os.tmpdir(), "local-session-marking-")));
@@ -52,9 +52,9 @@ async function configureExternal(item, name = "fixture") {
   const projectionPath = path.join(item.root, "projected.json");
   await writeFile(modulePath, [
     "import { writeFile } from 'node:fs/promises';",
-    "export const adapterApiVersion = 1;",
-    "export function describeSelection() { return { type: 'object', required: ['work'] }; }",
-    "export function resolveTarget({ selection }) { return { target: { work: selection.work }, context: {} }; }",
+    "export const adapterApiVersion = 2;",
+    "export function describeRequirements() { return { required: [], description: 'External fixture.' }; }",
+    "export function prepareBinding() { return { context: {} }; }",
     `export async function projectBinding(input) { const { binding, bindingPersisted = true } = input; const expected = bindingPersisted ? ['binding', 'context'] : ['binding', 'bindingPersisted', 'context']; if (JSON.stringify(Object.keys(input).sort()) !== JSON.stringify(expected)) throw Error('unexpected projection fields'); await writeFile(${JSON.stringify(projectionPath)}, JSON.stringify(binding)); return { status: 'projected', bindingPersisted }; }`,
   ].join("\n"));
   await configureAdapter({ name, modulePath, environment: item.environment });
@@ -72,7 +72,7 @@ for (const provider of ["codex", "claude-code"]) {
     assert.equal(result.bindingPath, bindingPath);
     assert.deepEqual(result.local, { bindingPath });
     assert.equal(result.projection, null);
-    assert.deepEqual(result.target, { kind: "local/project-task-v1", project: "website", task: "fix-login" });
+    assert.deepEqual(result.target, { kind: "session-marking/target-v1", project: "website", task: "fix-login" });
     assert.deepEqual(await filesBelow(item.root), [bindingPath]);
     const binding = JSON.parse(await readFile(bindingPath, "utf8"));
     assert.equal(binding.schemaVersion, 2);
@@ -89,9 +89,9 @@ test("local retries preserve the first observation and reject another target", a
   const secondDirectory = await realpath(await mkdtemp(path.join(item.root, "second-")));
   const selection = { project: "website", task: "fix-login" };
   const input = { selection, environment: sessionEnvironment(item), workingDirectory: firstDirectory, now: () => new Date("2026-09-13T10:00:00.000Z") };
-  const first = await markCurrentSession(input);
+  const first = await markSession(input);
   const original = await readFile(first.bindingPath, "utf8");
-  const retry = await markCurrentSession({ ...input, workingDirectory: secondDirectory, now: () => new Date("2026-09-13T11:00:00.000Z") });
+  const retry = await markSession({ ...input, workingDirectory: secondDirectory, now: () => new Date("2026-09-13T11:00:00.000Z") });
   assert.equal(retry.binding, "existing");
   assert.equal(retry.bindingPath, first.bindingPath);
   assert.equal(retry.projection, null);
@@ -128,42 +128,30 @@ test("local marking requires provider identity and respects the adapter guard", 
   assert.equal(result.binding, "created");
 });
 
-test("an external adapter named local still projects exactly its own target and canonical claim", async (t) => {
+test("an external adapter named local projects the shared target and canonical claim", async (t) => {
   const item = await fixture(t);
   const projectionPath = await configureExternal(item, "local");
-  const result = await mark(item, { work: "host-task" }, sessionEnvironment(item), ["--adapter", "local"]);
-  assert.deepEqual(result.target, { work: "host-task" });
+  const result = await mark(item, { project: "website", task: "host-task" }, sessionEnvironment(item), ["--adapter", "local"]);
+  assert.deepEqual(result.target, { kind: "session-marking/target-v1", project: "website", task: "host-task" });
   assert.deepEqual(result.projection, { status: "projected", bindingPersisted: true });
   const canonical = JSON.parse(await readFile(result.bindingPath, "utf8"));
   assert.deepEqual(JSON.parse(await readFile(projectionPath, "utf8")), canonical);
   assert.deepEqual(await filesBelow(item.environment.SESSION_MARKING_STATE_DIR), [result.bindingPath]);
 });
 
-test("external JSON target keys remain own properties without changing the object prototype", async (t) => {
+test("host selection rejects extra JSON keys before any binding or projection", async (t) => {
   const item = await fixture(t);
-  const modulePath = path.join(item.root, "adapter.mjs");
-  await writeFile(modulePath, [
-    "export const adapterApiVersion = 1;",
-    "export function describeSelection() { return { type: 'object' }; }",
-    "export function resolveTarget({ selection }) { if (Object.getPrototypeOf(selection) !== Object.prototype || !Object.hasOwn(selection, '__proto__')) throw new Error('selection key lost'); return { target: selection, context: {} }; }",
-    "export function projectBinding({ binding }) { if (Object.getPrototypeOf(binding.target) !== Object.prototype || !Object.hasOwn(binding.target, '__proto__')) throw new Error('target key lost'); return { status: 'projected' }; }",
-  ].join("\n"));
-  await configureAdapter({ name: "fixture", modulePath, environment: item.environment });
-  const selection = JSON.parse('{"work":"host-task","__proto__":{"extra":true}}');
-  const first = await mark(item, selection);
-  assert.deepEqual(first.target, selection);
-  const original = await readFile(first.bindingPath, "utf8");
-  assert.deepEqual(JSON.parse(original).target, selection);
-  const retry = await mark(item, selection);
-  assert.equal(retry.binding, "existing");
-  await assert.rejects(mark(item, JSON.parse('{"work":"host-task","__proto__":{"extra":false}}')), { code: "BINDING_CONFLICT" });
-  assert.equal(await readFile(first.bindingPath, "utf8"), original);
+  const projectionPath = await configureExternal(item);
+  const selection = JSON.parse('{"project":"website","task":"host-task","__proto__":{"extra":true}}');
+  await assert.rejects(mark(item, selection), { code: "SELECTION_INVALID" });
+  await assert.rejects(stat(projectionPath), { code: "ENOENT" });
+  await assert.rejects(stat(item.environment.SESSION_MARKING_STATE_DIR), { code: "ENOENT" });
 });
 
 test("switching mode preserves existing bindings and never broadcasts to the former host", async (t) => {
   const item = await fixture(t);
   const projectionPath = await configureExternal(item);
-  const external = await mark(item, { work: "host-task" });
+  const external = await mark(item, { project: "website", task: "host-task" });
   const originalClaim = await readFile(external.bindingPath, "utf8");
   const originalProjection = await readFile(projectionPath, "utf8");
   await runCli({ argv: ["configure", "--adapter", "local"], environment: item.environment, cwd: item.root });
@@ -174,7 +162,7 @@ test("switching mode preserves existing bindings and never broadcasts to the for
   assert.equal(await readFile(external.bindingPath, "utf8"), originalClaim);
   const localClaim = await readFile(local.bindingPath, "utf8");
   await configureExternal(item);
-  await assert.rejects(mark(item, { work: "host-task" }, sessionEnvironment(item, "codex", "new-session")), { code: "BINDING_CONFLICT" });
+  await assert.rejects(mark(item, { project: "website", task: "host-task" }, sessionEnvironment(item, "codex", "new-session")), { code: "BINDING_CONFLICT" });
   assert.equal(await readFile(local.bindingPath, "utf8"), localClaim);
   assert.equal(await readFile(projectionPath, "utf8"), originalProjection);
 });
@@ -184,11 +172,11 @@ for (const provider of ["codex", "claude-code"]) {
     const item = await fixture(t);
     const projectionPath = await configureExternal(item);
     const environment = sessionEnvironment(item, provider, "shared-output");
-    const selection = { work: "host-task" };
+    const selection = { project: "website", task: "host-task" };
     const result = await mark(item, selection, environment, ["--adapter", "fixture"]);
     assert.deepEqual(result.local, { bindingPath: result.bindingPath });
     assert.equal(result.projection.bindingPersisted, true);
-    assert.deepEqual(result.target, { work: "host-task" });
+    assert.deepEqual(result.target, { kind: "session-marking/target-v1", project: "website", task: "host-task" });
     const original = await readFile(result.bindingPath, "utf8");
     assert.deepEqual(JSON.parse(await readFile(projectionPath, "utf8")), JSON.parse(original));
 
@@ -204,7 +192,7 @@ for (const provider of ["codex", "claude-code"]) {
     assert.equal(retry.projection.bindingPersisted, false);
     assert.deepEqual(JSON.parse(await readFile(projectionPath, "utf8")).target, JSON.parse(original).target);
     assert.equal(await readFile(result.bindingPath, "utf8"), original);
-    assert.deepEqual((await mark(item, { work: "other-task" }, environment)).target, { work: "other-task" });
+    assert.deepEqual((await mark(item, { project: "website", task: "other-task" }, environment)).target, { kind: "session-marking/target-v1", project: "website", task: "other-task" });
     await assert.rejects(mark(item, selection, environment, ["--adapter", "local"]), { code: "ADAPTER_MISMATCH" });
     assert.deepEqual(await filesBelow(item.environment.SESSION_MARKING_STATE_DIR), [result.bindingPath]);
   });
@@ -218,7 +206,7 @@ test("host-only projection failure creates no local claim and a later invocation
   config.local.enabled = false;
   await writeFile(configPath, JSON.stringify(config));
   await mkdir(projectionPath);
-  const selection = { work: "repair-task" };
+  const selection = { project: "website", task: "repair-task" };
   await assert.rejects(mark(item, selection), { code: "EISDIR" });
   await assert.rejects(stat(item.environment.SESSION_MARKING_STATE_DIR), { code: "ENOENT" });
   await rm(projectionPath, { recursive: true });
@@ -249,13 +237,13 @@ test("host-only marking never reads or writes a disabled local store, including 
     await writeFile(configPath, JSON.stringify(config));
     const environment = sessionEnvironment(item);
     delete environment.SESSION_MARKING_STATE_DIR;
-    const result = await mark(item, { work: "host-task" }, environment);
+    const result = await mark(item, { project: "website", task: "host-task" }, environment);
     assert.equal(result.binding, null);
     assert.equal(result.bindingPath, null);
     assert.equal(result.local, null);
     assert.equal(result.projection.bindingPersisted, false);
   }
-  const result = await mark(item, { work: "host-task" }, { ...sessionEnvironment(item), SESSION_MARKING_STATE_DIR: "relative-and-unused" });
+  const result = await mark(item, { project: "website", task: "host-task" }, { ...sessionEnvironment(item), SESSION_MARKING_STATE_DIR: "relative-and-unused" });
   assert.equal(result.local, null);
   await assert.rejects(stat(missing), { code: "ENOENT" });
   assert.deepEqual(await readdir(actual), []);

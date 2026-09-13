@@ -1,6 +1,6 @@
 import { fail } from "./errors.mjs";
 
-const ROOTS = ["schemaVersion", "session", "target", "markedAt", "workingDirectory"];
+const ROOTS = ["schemaVersion", "session", "target", "markedAt", "workingDirectory", "description"];
 
 function fieldPath(value) {
   const parts = value.split(".");

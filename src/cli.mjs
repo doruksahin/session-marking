@@ -1,9 +1,10 @@
 import { fail } from "./errors.mjs";
+import { PROVIDERS } from "./session.mjs";
 
 const HELP = { names: ["--help", "-h"], description: "Show this help." };
 const COMMANDS = {
   configure: {
-    description: "Initialize or show configuration, or select a resolver.",
+    description: "Initialize or show configuration, or select an adapter.",
     options: [
       { name: "--adapter", value: "name", description: "Select local, or register a host with --module." },
       { name: "--module", value: "absolute-path", description: "Host adapter module; requires --adapter." },
@@ -12,20 +13,23 @@ const COMMANDS = {
     example: "session-marking configure --adapter local",
   },
   describe: {
-    description: "Show the active resolver's target selection fields.",
+    description: "Show shared target fields and configured host requirements.",
     options: [
-      { name: "--adapter", value: "name", description: "Assert the configured resolver name." },
+      { name: "--adapter", value: "name", description: "Assert the configured adapter name." },
     ],
-    notes: "Loads the configured resolver. No current-session identity is required.",
+    notes: "Shows core input fields with any host requirements. No current-session identity is required.",
     example: "session-marking describe",
   },
   mark: {
-    description: "Mark the current provider session for a selected target.",
+    description: "Mark a provider session for a selected target.",
     options: [
-      { name: "--adapter", value: "name", description: "Assert the configured resolver name." },
+      { name: "--adapter", value: "name", description: "Assert the configured adapter name." },
       { name: "--selection-json", value: "json-object", required: true, description: "Target fields returned by describe." },
+      { name: "--description", value: "text", allowEmpty: true, description: "Save a session note; retries retain the first description." },
+      { name: "--provider", value: PROVIDERS.join("|"), description: "Provider for an explicit session; requires --session-id." },
+      { name: "--session-id", value: "id", description: "Explicit session ID; requires --provider." },
     ],
-    notes: "Requires current Codex or Claude Code session identity.\nRun session-marking describe for the active target fields. Writes to configured destinations.",
+    notes: "Omit both identity options to use the current Codex or Claude Code session.\nUse --provider and --session-id together to select a specific session.\nRun session-marking describe for shared fields and host requirements. Writes to configured destinations.",
     example: "session-marking mark --selection-json '{\"project\":\"website\",\"task\":\"fix-login\"}'",
   },
   list: {
@@ -69,7 +73,7 @@ export function parseArguments(argv) {
     }
     const option = definition.options.find((candidate) => candidate.name === key);
     const value = argv[++index];
-    if (!option || !value || value.startsWith("--") || (Object.hasOwn(values, key) && !option.repeatable)) {
+    if (!option || (!value && !(option.allowEmpty && value === "")) || value.startsWith("--") || (Object.hasOwn(values, key) && !option.repeatable)) {
       fail("ARGUMENT_INVALID", "The session-marking arguments are invalid.");
     }
     if (option.repeatable) (values[key] ??= []).push(value);

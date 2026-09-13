@@ -4,13 +4,14 @@ import { realpath } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { loadAdapter, validateDescription } from "../src/adapter.mjs";
+import { loadAdapter, readRequirements } from "../src/adapter.mjs";
 import { commandUsage, parseArguments, renderHelp } from "../src/cli.mjs";
 import { configureAdapter, configureLocal, initializeConfig, readConfig, readStoredConfig, selectedAdapterName } from "../src/config.mjs";
 import { SessionMarkError, fail } from "../src/errors.mjs";
-import { markCurrentSession } from "../src/mark.mjs";
+import { markSession } from "../src/mark.mjs";
 import { parseQuery, queryBindings } from "../src/query.mjs";
 import { listBindings } from "../src/store.mjs";
+import { describeSelection } from "../src/target.mjs";
 
 function parseSelection(source) {
   let value;
@@ -38,10 +39,10 @@ export async function runCli({ argv = process.argv.slice(2), environment = proce
     const config = await readConfig({ environment });
     if (values["--adapter"] && values["--adapter"] !== selectedAdapterName(config)) fail("ADAPTER_MISMATCH", "The requested adapter is not configured.");
     const adapter = await loadAdapter(config);
-    return Object.freeze({ ok: true, adapter: adapter.name, selection: validateDescription(await adapter.describeSelection()) });
+    return Object.freeze({ ok: true, adapter: adapter.name, selection: describeSelection(await readRequirements(adapter)) });
   }
   if (command === "mark") {
-    return markCurrentSession({ selection: parseSelection(values["--selection-json"]), adapterName: values["--adapter"], environment, workingDirectory: cwd });
+    return markSession({ selection: parseSelection(values["--selection-json"]), description: values["--description"], provider: values["--provider"], sessionId: values["--session-id"], adapterName: values["--adapter"], environment, workingDirectory: cwd });
   }
   if (command === "list") {
     const query = parseQuery({ filters: values["--filter"], sort: values["--sort"], order: values["--order"] });
@@ -57,7 +58,7 @@ export function runMain(options) {
     (result) => process.stdout.write(`${typeof result === "string" ? result : JSON.stringify(result)}\n`),
     (error) => {
       const code = error instanceof SessionMarkError ? error.code : "SESSION_MARK_FAILED";
-      const message = error instanceof SessionMarkError ? error.message : "The current session could not be marked.";
+      const message = error instanceof SessionMarkError ? error.message : "The session could not be marked.";
       process.stderr.write(`${JSON.stringify({ ok: false, code, message })}\n`);
       process.exitCode = 1;
     },

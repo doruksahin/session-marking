@@ -1,6 +1,6 @@
 {
   "name": "session-marking",
-  "description": "Portable current-session marking for Codex and Claude Code.",
+  "description": "Portable session marking for Codex and Claude Code.",
   "owner": {
     "name": "AdCreative"
   },
@@ -8,7 +8,7 @@
     {
       "name": "session-marking",
       "source": "./",
-      "description": "Bind the current agent session to one explicit target through a configured adapter.",
+      "description": "Bind a Codex or Claude Code session to an explicit target with configured destinations.",
       "version": "1.6.0",
       "category": "productivity"
     }

@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 
 import { createBinding } from "../src/binding.mjs";
 import { configureAdapter } from "../src/config.mjs";
-import { markCurrentSession } from "../src/mark.mjs";
+import { markSession } from "../src/mark.mjs";
 import { runCli } from "../scripts/session-marking.mjs";
 
 const execFileAsync = promisify(execFile);
@@ -22,9 +22,9 @@ async function fixture(t, adapterSource) {
   const state = path.join(root, "state");
   const modulePath = path.join(root, "adapter.mjs");
   await writeFile(modulePath, adapterSource || [
-    "export const adapterApiVersion = 1;",
-    "export async function describeSelection() { return { type: 'object' }; }",
-    "export async function resolveTarget({ selection }) { return { target: selection, context: { selection } }; }",
+    "export const adapterApiVersion = 2;",
+    "export async function describeRequirements() { return { required: [], description: 'External fixture.' }; }",
+    "export async function prepareBinding({ target }) { return { context: { target } }; }",
     `export async function projectBinding({ binding }) { return { status: 'projected', markedAt: binding.markedAt }; }`,
   ].join("\n"));
   const environment = { ...process.env, HOME: root, SESSION_MARKING_CONFIG_DIR: config, SESSION_MARKING_STATE_DIR: state };
@@ -69,8 +69,8 @@ test("identical retries keep the first observation even from another directory",
   const item = await fixture(t);
   const firstDirectory = await realpath(await mkdtemp(path.join(item.root, "first-")));
   const secondDirectory = await realpath(await mkdtemp(path.join(item.root, "second-")));
-  const first = await markCurrentSession({ selection: { work: "A" }, environment: codex(item.environment, "same-session"), workingDirectory: firstDirectory, now: () => new Date("2026-08-26T10:00:00.000Z") });
-  const second = await markCurrentSession({ selection: { work: "A" }, environment: codex(item.environment, "same-session"), workingDirectory: secondDirectory, now: () => new Date("2026-08-26T11:00:00.000Z") });
+  const first = await markSession({ selection: { project: "website", task: "A" }, environment: codex(item.environment, "same-session"), workingDirectory: firstDirectory, now: () => new Date("2026-08-26T10:00:00.000Z") });
+  const second = await markSession({ selection: { project: "website", task: "A" }, environment: codex(item.environment, "same-session"), workingDirectory: secondDirectory, now: () => new Date("2026-08-26T11:00:00.000Z") });
   assert.equal(first.binding, "created");
   assert.equal(second.binding, "existing");
   assert.equal(second.projection.markedAt, "2026-08-26T10:00:00.000Z");
@@ -83,8 +83,8 @@ test("conflicting concurrent claims have exactly one winner", async (t) => {
   const item = await fixture(t);
   const base = { environment: codex(item.environment, "contended"), workingDirectory: item.root };
   const outcomes = await Promise.allSettled([
-    markCurrentSession({ ...base, selection: { work: "A" } }),
-    markCurrentSession({ ...base, selection: { work: "B" } }),
+    markSession({ ...base, selection: { project: "website", task: "A" } }),
+    markSession({ ...base, selection: { project: "website", task: "B" } }),
   ]);
   assert.equal(outcomes.filter((entry) => entry.status === "fulfilled").length, 1);
   const rejected = outcomes.find((entry) => entry.status === "rejected");
@@ -93,45 +93,46 @@ test("conflicting concurrent claims have exactly one winner", async (t) => {
 
 test("many sessions bind independently and provider namespaces isolate equal IDs", async (t) => {
   const item = await fixture(t);
-  const jobs = Array.from({ length: 20 }, (_, index) => markCurrentSession({
-    selection: { work: index }, environment: codex(item.environment, `parallel-${index}`), workingDirectory: item.root,
+  const jobs = Array.from({ length: 20 }, (_, index) => markSession({
+    selection: { project: "website", task: String(index) }, environment: codex(item.environment, `parallel-${index}`), workingDirectory: item.root,
   }));
   assert.equal((await Promise.all(jobs)).length, 20);
-  const claude = await markCurrentSession({ selection: { work: "claude" }, environment: { ...item.environment, CLAUDE_CODE_SESSION_ID: "parallel-0" }, workingDirectory: item.root });
+  const claude = await markSession({ selection: { project: "website", task: "claude" }, environment: { ...item.environment, CLAUDE_CODE_SESSION_ID: "parallel-0" }, workingDirectory: item.root });
   assert.equal(claude.provider, "claude-code");
   assert.equal(claude.sessionUrl, null);
 });
 
-test("identity is fail-closed and cannot be supplied as command data", async (t) => {
+test("automatic identity checks remain strict and selection cannot supply session identity", async (t) => {
   const item = await fixture(t);
-  await assert.rejects(markCurrentSession({ selection: { work: "A" }, environment: item.environment, workingDirectory: item.root }), { code: "SESSION_ID_UNAVAILABLE" });
-  await assert.rejects(markCurrentSession({ selection: { work: "A" }, environment: { ...codex(item.environment, "one"), CLAUDE_CODE_SESSION_ID: "two" }, workingDirectory: item.root }), { code: "SESSION_PROVIDER_AMBIGUOUS" });
-  const result = await markCurrentSession({ selection: { work: "A", sessionId: "forged" }, environment: codex(item.environment, "real"), workingDirectory: item.root });
+  await assert.rejects(markSession({ selection: { project: "website", task: "A" }, environment: item.environment, workingDirectory: item.root }), { code: "SESSION_ID_UNAVAILABLE" });
+  await assert.rejects(markSession({ selection: { project: "website", task: "A" }, environment: { ...codex(item.environment, "one"), CLAUDE_CODE_SESSION_ID: "two" }, workingDirectory: item.root }), { code: "SESSION_PROVIDER_AMBIGUOUS" });
+  await assert.rejects(markSession({ selection: { project: "website", task: "A", sessionId: "forged" }, environment: codex(item.environment, "real"), workingDirectory: item.root }), { code: "SELECTION_INVALID" });
+  const result = await markSession({ selection: { project: "website", task: "A" }, environment: codex(item.environment, "real"), workingDirectory: item.root });
   assert.equal(result.sessionId, "real");
-  assert.equal(result.target.sessionId, "forged");
+  assert.equal(result.target.sessionId, undefined);
 });
 
 test("a durable claim survives projection failure and an identical retry repairs it", async (t) => {
   const source = [
     "import { access, writeFile } from 'node:fs/promises';",
-    "export const adapterApiVersion = 1;",
-    "export async function describeSelection() { return { type: 'object' }; }",
-    "export async function resolveTarget({ selection }) { return { target: { work: selection.work }, context: { sentinel: selection.sentinel } }; }",
+    "export const adapterApiVersion = 2;",
+    "export async function describeRequirements() { return { required: [], description: 'External fixture.' }; }",
+    "export async function prepareBinding({ workingDirectory }) { return { context: { sentinel: workingDirectory + '/sentinel' } }; }",
     "export async function projectBinding({ context }) {",
     "  try { await access(context.sentinel); } catch { await writeFile(context.sentinel, 'retry'); throw new Error('interrupted projection'); }",
     "  return { status: 'repaired' };",
     "}",
   ].join("\n");
   const item = await fixture(t, source);
-  const selection = { work: "repair", sentinel: path.join(item.root, "sentinel") };
+  const selection = { project: "website", task: "repair" };
   const input = { selection, environment: codex(item.environment, "repairable"), workingDirectory: item.root };
-  await assert.rejects(markCurrentSession(input), /interrupted projection/);
-  const repaired = await markCurrentSession(input);
+  await assert.rejects(markSession(input), /interrupted projection/);
+  const repaired = await markSession(input);
   assert.equal(repaired.binding, "existing");
   assert.equal(repaired.projection.status, "repaired");
 });
 
 test("binding validation rejects unsupported session data", async (t) => {
   const item = await fixture(t);
-  assert.throws(() => createBinding({ schemaVersion: 2, session: { provider: "codex", id: "x", url: null }, target: { work: "A" }, markedAt: new Date().toISOString(), workingDirectory: item.root }), { code: "BINDING_INVALID" });
+  assert.throws(() => createBinding({ schemaVersion: 2, session: { provider: "codex", id: "x", url: null }, target: { project: "website", task: "A" }, markedAt: new Date().toISOString(), workingDirectory: item.root }), { code: "BINDING_INVALID" });
 });

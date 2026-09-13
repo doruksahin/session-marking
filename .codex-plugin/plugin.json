@@ -1,15 +1,15 @@
 {
   "name": "session-marking",
   "version": "1.6.0",
-  "description": "Bind the current agent session to one explicit target through a configured adapter.",
+  "description": "Bind a Codex or Claude Code session to an explicit target with configured destinations.",
   "author": {
     "name": "AdCreative"
   },
   "skills": "./skills/",
   "interface": {
     "displayName": "Session Marking",
-    "shortDescription": "Bind the current session to one target.",
-    "longDescription": "Session Marking provides explicit, immutable, race-safe binding of the current Codex or Claude Code session through one configured target adapter.",
+    "shortDescription": "Bind a session to one explicit target.",
+    "longDescription": "Mark the current Codex or Claude Code session, or supply its provider and session ID from a terminal. Save the binding locally and optionally project it through a configured host adapter.",
     "developerName": "AdCreative",
     "category": "Productivity",
     "capabilities": [],
