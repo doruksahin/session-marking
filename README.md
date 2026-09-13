@@ -48,6 +48,40 @@ marking a session. Configuration is machine-local; rerun setup when the adapter 
 The portable plugin does not include the adc-vault adapter. For another host, follow
 [the adapter contract](docs/adapter-contract.md#register-and-invoke).
 
+## Install globally with pnpm
+
+To run `session-marking` from any directory, install the CLI from your local checkout.
+After cloning the repository, run this from its root:
+
+```sh
+pnpm add -g .
+```
+
+If pnpm reports that its global bin directory is missing, run `pnpm setup`, reopen your
+terminal, and retry. Node.js 20 or newer is required.
+
+Complete the adapter configuration in [Install](#install), then verify the global command:
+
+```sh
+session-marking describe
+```
+
+The command supports the same `configure`, `describe`, and `mark` operations as the Node.js
+script. `mark` must run with the current Codex or Claude Code session identity in its environment;
+a regular terminal without that identity cannot mark a session. Installing the global CLI does
+not register the Codex or Claude Code skill; use the provider installation steps above for that.
+
+Keep the checkout in place. With this local installation, source and version changes take effect
+on the next command invocation; no reload or reinstall is needed. Rerun `pnpm add -g .` if the
+command name or entry-point path changes. Provider-installed plugin copies still follow the
+separate [update steps](#update).
+
+To remove the global command:
+
+```sh
+pnpm remove -g session-marking
+```
+
 ## Migrate from adc-vault
 
 Install and verify the new marketplace using the steps above before removing the old plugin.

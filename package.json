@@ -3,6 +3,9 @@
   "version": "1.2.0",
   "private": true,
   "type": "module",
+  "bin": {
+    "session-marking": "./scripts/session-marking.mjs"
+  },
   "scripts": {
     "test": "node --test tests/*.test.js",
     "check": "node --check scripts/session-marking.mjs && node --check scripts/sync-version.mjs",
