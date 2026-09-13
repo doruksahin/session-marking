@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.4.0](https://github.com/doruksahin/session-marking/compare/session-marking-v1.3.0...session-marking-v1.4.0) (2026-09-13)
+
+
+### Features
+
+* **session-marking:** default to canonical local bindings ([ddf78e4](https://github.com/doruksahin/session-marking/commit/ddf78e4f7de66a6389bdc9d380bfc6d7ef8cc48a))
+* **session-marking:** default to canonical local bindings ([2f3517b](https://github.com/doruksahin/session-marking/commit/2f3517b5b074fe92e395001a5fe88c2bff12ca45))
+
 ## [1.3.0](https://github.com/doruksahin/session-marking/compare/f542ca3a4d4fac850edf6990c15578b8d7bbf5c7...session-marking-v1.3.0) (2026-09-13)
 
 
