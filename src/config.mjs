@@ -62,7 +62,7 @@ async function canonicalModule(modulePath) {
   return canonical;
 }
 
-async function storedConfig(environment) {
+export async function readStoredConfig({ environment = process.env } = {}) {
   const source = await readOptionalFile(path.join(configDirectory(environment), "config.json"), 64 * 1024);
   return source === null ? DEFAULT_CONFIG : parseConfig(source);
 }
@@ -75,17 +75,17 @@ async function writeConfig(config, environment) {
 export async function configureAdapter({ name, modulePath, environment = process.env }) {
   if (typeof name !== "string" || !ADAPTER_NAME_PATTERN.test(name)) fail("ADAPTER_INVALID", "The adapter name is invalid.");
   const module = await canonicalModule(modulePath);
-  const previous = await storedConfig(environment);
+  const previous = await readStoredConfig({ environment });
   return writeConfig(configValue({ ...previous, host: { enabled: true, name, module } }), environment);
 }
 
 export async function configureLocal({ environment = process.env } = {}) {
-  const previous = await storedConfig(environment);
+  const previous = await readStoredConfig({ environment });
   return writeConfig(configValue({ ...previous, local: { ...previous.local, enabled: true }, host: { ...previous.host, enabled: false } }), environment);
 }
 
 export async function readConfig({ environment = process.env } = {}) {
-  const config = await storedConfig(environment);
+  const config = await readStoredConfig({ environment });
   if (!config.local.enabled && !config.host.enabled) fail("CONFIG_INVALID", "Enable at least one session-marking output.");
   if (config.host.enabled) {
     const module = await canonicalModule(config.host.module);

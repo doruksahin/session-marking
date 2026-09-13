@@ -11,6 +11,7 @@ and publish a record in that host.
 | --- | --- |
 | Install the CLI or native plugin, update, or uninstall | [Installation](docs/installation.md) |
 | Run a command, understand its result, or resolve an error | [CLI guide](docs/cli.md) |
+| Find saved sessions by task or stage | [List sessions](docs/cli.md#list) |
 | Change the local store or enable destinations | [Configuration](docs/configuration.md) |
 | Mark a packet stage in adc-vault | [adc-vault integration](docs/integrations/adc-vault.md) |
 | Implement a host integration | [Adapter contract](docs/adapter-contract.md) |

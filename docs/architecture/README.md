@@ -30,7 +30,7 @@ The CLI runs locally. [Provider identity](../../src/session.mjs) comes from the 
 only when local persistence is enabled. The host receives that winning binding, or the invocation's
 candidate when local is disabled, with `bindingPersisted: false` only for host-only calls. Success returns
 the local path and status when stored, otherwise null local fields, plus any host projection.
-Disabled local persistence performs no store access and creates no hidden receipt. Host-only
+Marking with local persistence disabled performs no store access and creates no hidden receipt. Host-only
 persistence and retries belong to the host adapter; destinations are not synchronized.
 [Configuration and state paths](../../src/paths.mjs) remain machine-local and independent of the
 source checkout. `SESSION_MARKING_STATE_DIR` overrides `local.directory`, which defaults to the
@@ -41,6 +41,11 @@ configuration overlays known fields. Missing configuration uses defaults without
 rewriting. Existing external configuration enables both outputs. Explicit host registration preserves
 the local setting; disabling a host retains settings without importing or requiring its module. The adapter's transient context is
 passed to projection and never persisted by the core.
+
+[Listing](../cli.md#list) reads existing bindings from the configured local store regardless of
+whether local writes are enabled. It requires no provider identity and never loads the host adapter.
+The store validates saved records; a pure query module filters and sorts them without host-specific
+fields or storage writes.
 
 ## Failure behavior
 
@@ -54,15 +59,19 @@ records host obligations and [CLI errors](../adapter-contract.md#errors) define 
 
 | Concern | Owning files |
 | --- | --- |
-| CLI arguments and JSON responses | [scripts/session-marking.mjs](../../scripts/session-marking.mjs) |
+| Command dispatch and JSON or help responses | [scripts/session-marking.mjs](../../scripts/session-marking.mjs) |
+| Shared option definitions, argument parsing, and help text | [cli.mjs](../../src/cli.mjs) |
 | Runtime operation order | [mark.mjs](../../src/mark.mjs) |
 | Config parsing, defaults, and path selection | [config.mjs](../../src/config.mjs), [config.defaults.json](../../config.defaults.json), [paths.mjs](../../src/paths.mjs) |
 | Local selection and host adapter loading | [local-target.mjs](../../src/local-target.mjs), [adapter.mjs](../../src/adapter.mjs) |
 | Provider identity and binding format | [session.mjs](../../src/session.mjs), [binding.mjs](../../src/binding.mjs), [canonical-json.mjs](../../src/canonical-json.mjs) |
-| Local immutable writes and filesystem operations | [store.mjs](../../src/store.mjs), [safe-files.mjs](../../src/safe-files.mjs) |
+| Local binding reads, immutable writes, and filesystem operations | [store.mjs](../../src/store.mjs), [safe-files.mjs](../../src/safe-files.mjs) |
+| Listing filters and sorting | [query.mjs](../../src/query.mjs) |
 | Agent invocation | [SKILL.md](../../skills/session-marking/SKILL.md) |
 
 Host adapters stay in their owning repositories and use the [adapter contract](../adapter-contract.md).
+CLI parsing and help share command and option definitions. Help returns before user configuration,
+adapter loading, or session lookup; examples are exercised through the executable in temporary stores.
 Local persistence uses the same binding operation for built-in and host-resolved targets.
 [Extraction provenance](../extraction.md) identifies the retained source baseline. Version mirrors
 and the independent release lane are owned by [the release configuration](../../release-please-config.json).

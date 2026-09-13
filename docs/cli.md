@@ -2,8 +2,23 @@
 
 [Start here](../README.md) · Setup: [installation](installation.md) · Settings: [configuration](configuration.md)
 
-The commands are `configure`, `describe`, and `mark`. Each returns one JSON success object on stdout.
+The commands are `configure`, `describe`, `mark`, and `list`. Normal execution returns one JSON success object on stdout;
+help returns plain text.
 Failures return `{ "ok": false, "code": "…", "message": "…" }` on stderr with exit status 1.
+
+## Help
+
+Start with `session-marking --help`, then ask for the command you need:
+
+```sh
+session-marking list --help
+session-marking mark --help
+```
+
+Every command supports `--help` and `-h`. Running `session-marking` without arguments also shows
+the command overview. Help exits successfully without reading user configuration, loading adapters,
+or requiring a current session. Options and examples stay brief; this guide owns the detailed behavior.
+For adapter-specific selection fields, run [describe](#describe).
 
 ## Mark your first session
 
@@ -117,6 +132,55 @@ Marking creates binding records; it does not modify the LLM transcript or infer 
 branch, working directory, or conversation. The saved local JSON uses binding schema version 2,
 with `session`, `target`, `markedAt`, and `workingDirectory` alongside `schemaVersion`.
 
+## List
+
+List saved local sessions from an ordinary terminal; no current LLM session is required:
+
+```sh
+session-marking list | jq
+session-marking list --filter target.jiraKey=ATT-5551 | jq
+session-marking list --filter target.jiraKey=ATT-5551 --sort target.stageId | jq
+```
+
+The response is `{ "ok": true, "sessions": [...] }`. Each item is the full saved binding described
+under [mark](#mark), including its session identity, target, marking time, and working directory.
+A missing store or no matches returns an empty `sessions` array.
+
+| Option | Behavior |
+| --- | --- |
+| `--filter <field>=<value>` | Exact, case-sensitive scalar text match; repeat for conditions that must all match |
+| `--sort <field>` | Sort alphabetically by scalar text, ascending by default |
+| `--order asc\|desc` | Override sort direction; without `--sort`, sort by `markedAt` |
+
+With no sort options, the newest marks appear first (`markedAt` descending). Field paths start
+with a saved binding field, such as `target.jiraKey`, `target.project`, or `session.provider`.
+Numbers, booleans, and null compare as their text values. Missing fields, objects, and arrays do not match
+filters and sort last in either direction; ties use provider then session ID. Stage IDs sort
+alphabetically, without inferring workflow order.
+
+For a compact result, let `jq` select the fields to display:
+
+```sh
+session-marking list --filter target.jiraKey=ATT-5551 --sort target.stageId \
+  | jq '.sessions | map({jiraKey: .target.jiraKey, stageId: .target.stageId, sessionId: .session.id})'
+```
+
+Illustrative output:
+
+```json
+[
+  {
+    "jiraKey": "ATT-5551",
+    "stageId": "implementation",
+    "sessionId": "example-session"
+  }
+]
+```
+
+Listing reads the [configured local store](configuration.md#file-locations), even when local writes
+are disabled. It never loads the host adapter or reads host records, so sessions saved only to a
+host do not appear. An invalid saved record fails the command instead of returning a partial list.
+
 ## Session identity
 
 The provider must supply the identity in the command's environment:
@@ -143,6 +207,7 @@ command pass. [session.mjs](../src/session.mjs) owns this validation.
 | `SESSION_ID_UNAVAILABLE` / `SESSION_ID_MISMATCH` / `SESSION_PROVIDER_AMBIGUOUS` | Check [provider identity](#session-identity) in the current session |
 | `BINDING_CONFLICT` | The selected local store already binds this session to another target; use its existing target or a new provider session |
 | `BINDING_INVALID` | The existing record failed validation; inspect it without overwriting it |
+| `FILE_INVALID` / `PATH_UNSAFE` | Check that the local store is readable and uses regular files and canonical directories, without symlinks |
 | `PATH_INVALID` | Check that directory overrides are absolute and not filesystem roots |
 
 Hosts may return their own actionable error codes. Unexpected failures are masked as
