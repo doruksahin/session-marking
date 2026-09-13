@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.0.0](https://github.com/doruksahin/session-marking/compare/session-marking-v1.6.0...session-marking-v2.0.0) (2026-09-13)
+
+
+### ⚠ BREAKING CHANGES
+
+* unify session targets and support explicit session marking
+
+### Features
+
+* unify session targets and support explicit session marking ([8245931](https://github.com/doruksahin/session-marking/commit/8245931157cbbc5a4508603a60574af5d57e1aaf))
+
 ## [1.6.0](https://github.com/doruksahin/session-marking/compare/session-marking-v1.5.0...session-marking-v1.6.0) (2026-09-13)
 
 
