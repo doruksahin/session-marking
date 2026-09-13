@@ -5,7 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { loadAdapter, validateDescription } from "../src/adapter.mjs";
-import { configureAdapter, readConfig } from "../src/config.mjs";
+import { configureAdapter, configureLocal, readConfig, selectedAdapterName } from "../src/config.mjs";
 import { SessionMarkError, fail } from "../src/errors.mjs";
 import { markCurrentSession } from "../src/mark.mjs";
 
@@ -30,14 +30,18 @@ export async function runCli({ argv = process.argv.slice(2), environment = proce
   const command = argv[0];
   if (command === "configure") {
     const values = argumentMap(argv.slice(1), ["--adapter", "--module"]);
-    if (!values["--adapter"] || !values["--module"]) fail("ARGUMENT_INVALID", "Usage: session-marking configure --adapter <name> --module <absolute-path>");
+    if (values["--adapter"] === "local" && !values["--module"]) {
+      const result = await configureLocal({ environment });
+      return Object.freeze({ ok: true, adapter: "local", configPath: result.configPath });
+    }
+    if (!values["--adapter"] || !values["--module"]) fail("ARGUMENT_INVALID", "Usage: session-marking configure --adapter local | --adapter <name> --module <absolute-path>");
     const result = await configureAdapter({ name: values["--adapter"], modulePath: values["--module"], environment });
     return Object.freeze({ ok: true, adapter: result.config.adapter.name, module: result.config.adapter.module, configPath: result.configPath });
   }
   if (command === "describe") {
     const values = argumentMap(argv.slice(1), ["--adapter"]);
     const config = await readConfig({ environment });
-    if (values["--adapter"] && values["--adapter"] !== config.adapter.name) fail("ADAPTER_MISMATCH", "The requested adapter is not configured.");
+    if (values["--adapter"] && values["--adapter"] !== selectedAdapterName(config)) fail("ADAPTER_MISMATCH", "The requested adapter is not configured.");
     const adapter = await loadAdapter(config);
     return Object.freeze({ ok: true, adapter: adapter.name, selection: validateDescription(await adapter.describeSelection()) });
   }

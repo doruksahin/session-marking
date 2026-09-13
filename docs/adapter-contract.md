@@ -1,9 +1,29 @@
 # Adapter API version 1
 
-The portable plugin loads one configured local ES module. The adapter owns target selection,
-validation, and projection into its host. The plugin owns provider identity and the immutable
-machine-local session claim. See [the loader](../src/adapter.mjs) and
+The portable plugin uses built-in local mode unless an external adapter is configured. An external
+adapter owns target selection, validation, and projection into its host. The plugin owns provider
+identity, local target selection, and the immutable machine-local session claim in either mode. See [the loader](../src/adapter.mjs) and
 [the operation order](../src/mark.mjs) for executable authority.
+
+## Local mode and configuration
+
+Missing configuration selects built-in local mode without writing a configuration file. Local
+selection is exactly `{ "project": "website", "task": "fix-login" }`: each value must be a nonblank
+string of 1–256 characters with no leading or trailing whitespace. The resulting target is `{ "kind": "local/project-task-v1", "project": "website", "task": "fix-login" }`
+and is stored in the existing immutable binding. The kind namespaces local target identity. Local mode does not load an external module or create a second
+local record; successful `mark` returns `projection: null`.
+
+`configure --adapter local` explicitly saves `{ "schemaVersion": 2, "mode": "local" }`.
+Existing version-1 external configuration remains supported and active, including an external
+adapter named `local`. Supplying `--module` always registers an external adapter. Malformed or unsupported
+configuration fails instead of falling back to local mode. Configuration changes affect future
+commands and do not rewrite existing bindings. Optional `--adapter` asserts the selected mode or
+adapter name; it does not route a command to another destination.
+
+Both modes return the absolute canonical `bindingPath` on successful marking. Configuration and
+state keep the existing platform defaults in [paths.mjs](../src/paths.mjs).
+`SESSION_MARKING_CONFIG_DIR` and `SESSION_MARKING_STATE_DIR` override those directories independently
+with absolute paths; callers must keep their environment consistent across invocations.
 
 ## Register and invoke
 
@@ -66,8 +86,9 @@ Missing exports or the wrong API version fail with `ADAPTER_INVALID`; import fai
 
 ## Compatibility
 
-This extraction preserves API version 1, configuration schema version 1, binding schema version 2,
-and all [machine-local paths](../src/paths.mjs). Source checkout and marketplace changes do not
-change existing claims or require a state reset. Configuration stores the canonical adapter path;
-register it again when the adapter moves. The portable plugin has one configured adapter and no
-host-specific routing or SDK dependency.
+External adapters retain API version 1 and configuration schema version 1. Explicit local mode
+uses configuration schema version 2; both modes retain binding schema version 2 and all
+[machine-local paths](../src/paths.mjs). Source checkout and marketplace changes do not
+change existing claims or require a state reset. External configuration stores the canonical adapter path;
+register it again when the adapter moves. Each command selects local mode or one configured external adapter. The plugin has no
+multi-adapter broadcasting, host-specific routing, or SDK dependency.
